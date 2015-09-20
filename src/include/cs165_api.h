@@ -90,8 +90,8 @@ typedef struct column {
  * Defines a table structure, which is composed of multiple columns.
  * We do not require you to dynamically manage the size of your tables,
  * although you are free to append to the struct if you would like to (i.e.,
- * in clude a size_t table_size).
- * name, the name associated with the table. Table names must be unique
+ * include a size_t table_size).
+ * - name, the name associated with the table. Table names must be unique
  *     within a database, but tables from different databases can have the same
  *     name.
  * - col_count, the number of columns in the table
@@ -279,7 +279,7 @@ typedef enum OpenFlags {
  * flags   : the flags indicating the create/load options
  * returns : a status of the operation.
  */
-status open_db(const char* filename, db** db, OpenFlags flags);
+status open_db(const char* filename, db** database, OpenFlags flags);
 
 /**
  * drop_db(db)
@@ -289,7 +289,7 @@ status open_db(const char* filename, db** db, OpenFlags flags);
  * db       : the database to be dropped.
  * returns  : the status of the operation.
  **/
-status drop_db(db* db);
+status drop_db(db* database);
 
 /**
  * sync_db(db)
@@ -298,7 +298,7 @@ status drop_db(db* db);
  * db       : the database to sync.
  * returns  : the status of the operation.
  **/
-status sync_db(db* db);
+status sync_db(db* database);
 
 /**
  * create_db(db_name, db)
@@ -317,7 +317,7 @@ status sync_db(db* db);
  *      // Something went wrong
  *  }
  **/
-status create_db(const char* db_name, db** db);
+status create_db(const char* db_name, db** database);
 
 /**
  * create_table(db, name, num_columns, table)
@@ -340,7 +340,7 @@ status create_db(const char* db_name, db** db);
  *      // Something went wrong
  *  }
  **/
-status create_table(db* db, const char* name, size_t num_columns, table** table);
+status create_table(db* database, const char* name, size_t num_columns, table** tb);
 
 /**
  * drop_table(db, table)
@@ -351,7 +351,7 @@ status create_table(db* db, const char* name, size_t num_columns, table** table)
  * table    : the table to be dropped.
  * returns  : the status of the operation.
  **/
-status drop_table(db* db, table* table);
+status drop_table(db* database, table* tb);
 
 /**
  * create_column(table, name, col)
@@ -372,7 +372,7 @@ status drop_table(db* db, table* table);
  *      // Something went wrong
  *  }
  **/
-status create_column(table *table, const char* name, column** col);
+status create_column(table *tb, const char* name, column** col);
 
 /**
  * create_index(col, type)

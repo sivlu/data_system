@@ -3,6 +3,8 @@ project(blus_cs165_2015_base)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
+INCLUDE_DIRECTORIES(src/include/)
+
 set(SOURCE_FILES
     src/include/common.h
     src/include/cs165_api.h
@@ -12,6 +14,7 @@ set(SOURCE_FILES
     src/Makefile
     src/README.md
     src/server.c
-    src/utils.c)
+    src/utils.c src/include/parser.h)
+
 
 add_executable(blus_cs165_2015_base ${SOURCE_FILES})
