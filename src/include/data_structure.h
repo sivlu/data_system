@@ -7,13 +7,28 @@
 
 #include <stdlib.h>
 
-#define VAR_TABLE_SIZE 100 //number of variables we keep track
+/*-----------Start of Definition of Macros------------------- ----*/
+
 #define COL_SIZE 100 //number of values in a column
 #define DB_SIZE 10//number of tables in a db
+#define DATA_PATH "./data/" //default data path to store the data
+
+/*-----------End of Definition of Macros--------------------------*/
 
 
-//global var "var_table" is the table we keep track of "var_entry" records
-extern struct var_entry var_table[VAR_TABLE_SIZE];
+/*-----------Start of Definition of Global Variables---------------*/
+
+/*
+ * global var "var_table" is the table we keep track of DSL varibles
+ */
+extern struct var_node* var_table;
+/*
+ * keep track what db has been created
+ */
+extern struct db_node* db_table;
+
+/*-----------End of Definition of Global Variables------------------*/
+
 
 /**
  * EXTRA
@@ -23,6 +38,7 @@ extern struct var_entry var_table[VAR_TABLE_SIZE];
  * in place of int* in db_operator simliar to the way IndexType supports
  * additional types.
  **/
+
 /**
 typedef enum DataType {
      INT,
@@ -31,24 +47,105 @@ typedef enum DataType {
 } DataType;
 **/
 
+/*-----------Start of Type Definition of Enums----------------------*/
+
 /*
- * FlagType
+ * PosFlag
+ * for indication of a position in table or db
  */
-typedef enum FlagType{
+typedef enum PosFlag{
     EMPTY,
     FULL,
-}FlagType;
+}PosFlag;
 
 /**
  * IndexType
- * Flag to identify index type. Defines an enum for the different possible column indices.
- * Additonal types are encouraged as extra.
+ * Flag to identify index type.
+ * Defines an enum for the different possible column indices.
+ * Additional types are encouraged as extra.
  **/
 typedef enum IndexType {
     SORTED,
     B_PLUS_TREE,
 } IndexType;
 
+/**
+ * Defines a comparator flag between two values.
+ **/
+typedef enum ComparatorType {
+    LESS_THAN = 1,
+    GREATER_THAN = 2,
+    EQUAL = 4,
+} ComparatorType;
+
+/**
+ * A Junction defines the relationship between comparators.
+ * In cases where we have more than one comparator, e.g. A.a <= 5 AND A.b > 3,
+ * A NONE Junction defines the END of a comparator junction.
+ *
+ * Using the comparator struct defined below, we would represent our example using:
+ *     // This represents the sub-component (A.b > 3)
+ *     comparator f_b;
+ *     f_b.p_val = 3; // Predicate values
+ *     f_b.type = GREATER_THAN;
+ *     f_b.mode = NONE;
+ *     f_b.col = col_b;
+ *
+ *     // This represents the entire comparator
+ *     comparator f;
+ *     f.value = 5;
+ *     f.type = LESS_THAN | EQUAL;
+ *     f.mode = AND;
+ *     f.col = col_b;
+ *     f.next_comparator = &f_b;
+ * For chains of more than two Juntions, left associative: "a | b & c | d"
+ * evaluated as "(((a | b) & c) | d)".
+ **/
+typedef enum Junction {
+    NONE,
+    OR,
+    AND,
+} Junction;
+
+typedef enum Aggr {
+    MIN,
+    MAX,
+    SUM,
+    AVG,
+    CNT,
+} Aggr;
+
+typedef enum OperatorType {
+    CREATE,
+    DROP,
+    SELECT,
+    PROJECT,
+    HASH_JOIN,
+    INSERT,
+    DELETE,
+    UPDATE,
+    AGGREGATE,
+} OperatorType;
+
+/**
+ * Error codes used to indicate the outcome of an API call
+ **/
+typedef enum StatusCode {
+    OK,
+    ERROR,
+} StatusCode;
+
+typedef enum OpenFlags {
+    CREATE = 1,
+    LOAD = 2,
+} OpenFlags;
+
+
+/*-----------End of Type Definition of Enums-----------------------*/
+
+
+
+/*-----------Start of Type Definition of Struct--------------------*/
 /**
  * column_index
  * Defines a general column_index structure, which can be used as a sorted
@@ -106,7 +203,7 @@ typedef struct table {
     char* name;
     size_t col_count;
     column* cols;
-    FlagType* cols_pos;
+    PosFlag* cols_pos;
     size_t tb_size;
     size_t col_length;
 
@@ -126,60 +223,17 @@ typedef struct db {
     char* name;
     size_t table_count;
     table* tables;
-    FlagType* tables_pos;
+    PosFlag* tables_pos;
     size_t db_size;
 } db;
 
-/**
- * Error codes used to indicate the outcome of an API call
- **/
-typedef enum StatusCode {
-    /* The operation completed successfully */
-            OK,
-    /* There was an error with the call.
-    */
-            ERROR,
-} StatusCode;
-
-// status declares an error code and associated message
+/* status declares an error code and associated message
+ *
+ */
 typedef struct status {
     StatusCode code;
     char* error_message;
 } status;
-
-// Defines a comparator flag between two values.
-typedef enum ComparatorType {
-    LESS_THAN = 1,
-    GREATER_THAN = 2,
-    EQUAL = 4,
-} ComparatorType;
-
-/**
- * A Junction defines the relationship between comparators.
- * In cases where we have more than one comparator, e.g. A.a <= 5 AND A.b > 3,
- * A NONE Junction defines the END of a comparator junction.
- *
- * Using the comparator struct defined below, we would represent our example using:
- *     // This represents the sub-component (A.b > 3)
- *     comparator f_b;
- *     f_b.p_val = 3; // Predicate values
- *     f_b.type = GREATER_THAN;
- *     f_b.mode = NONE;
- *
- *     // This represents the entire comparator
- *     comparator f;
- *     f.value = 5;
- *     f.mode = LESS_THAN | EQUAL;
- *     f.next_comparator = &f_b;
- * For chains of more than two Juntions, left associative: "a | b & c | d"
- * evaluated as "(((a | b) & c) | d)".
- **/
-
-typedef enum Junction {
-    NONE,
-    OR,
-    AND,
-} Junction;
 
 /**
  * comparator
@@ -190,8 +244,8 @@ typedef struct comparator {
     int p_val;
     column *col;
     ComparatorType type;
-    struct comparator *next_comparator;
     Junction mode;
+    struct comparator *next_comparator;
 } comparator;
 
 typedef struct result {
@@ -199,25 +253,6 @@ typedef struct result {
     int *payload;
 } result;
 
-typedef enum Aggr {
-    MIN,
-    MAX,
-    SUM,
-    AVG,
-    CNT,
-} Aggr;
-
-typedef enum OperatorType {
-    CREATE,
-    DROP,
-    SELECT,
-    PROJECT,
-    HASH_JOIN,
-    INSERT,
-    DELETE,
-    UPDATE,
-    AGGREGATE,
-} OperatorType;
 
 typedef struct query_org{
     OperatorType type; //type of the function
@@ -225,9 +260,81 @@ typedef struct query_org{
     char* rightside; //array of arguments
 }query_org;
 
-typedef struct var_entry{
+/**
+ * db_operator
+ * The db_operator defines a database operation.  Generally, an operation will
+ * be applied on column(s) of a table (SELECT, PROJECT, AGGREGATE) while other
+ * operations may involve multiple tables (JOINS). The OperatorType defines
+ * the kind of operation.
+ *
+ * In UNARY operators that only require a single table, only the variables
+ * related to table1/column1 will be used.
+ * In BINARY operators, the variables related to table2/column2 will be used.
+ *
+ * If you are operating on more than two tables, you should rely on separating
+ * it into multiple operations (e.g., if you have to project on more than 2
+ * tables, you should select in one operation, and then create separate
+ * operators for each projection).
+ *
+ * Example query:
+ * SELECT a FROM A WHERE A.a < 100;
+ * db_operator op1;
+ * op1.table1 = A;
+ * op1.column1 = b;
+ *
+ * filter f;
+ * f.value = 100;
+ * f.type = LESS_THAN;
+ * f.mode = NONE;
+ *
+ * op1.comparator = f;
+ **/
+typedef struct db_operator {
+    // Flag to choose operator
+    OperatorType type;
+
+    // Used for every operator
+    table** tables;
+    column** columns;
+
+    // Intermediaties used for PROJECT, DELETE, HASH_JOIN
+    int *pos1;
+    // Needed for HASH_JOIN
+    int *pos2;
+
+    // For insert/delete operations, we only use value1;
+    // For update operations, we update value1 -> value2;
+    int *value1;
+    int *value2;
+
+    // This includes several possible fields that may be used in the operation.
+    Aggr agg;
+    comparator* c;
+
+} db_operator;
+
+/*
+ * db_node to form a linked list
+ * this_db: points to a db
+ * next: points to next node
+ */
+typedef struct db_node{
+    db* this_db;
+    struct db_node* next;
+}db_node;
+
+/*
+ * var_node to form a linked list to keep track of
+ * variables used in DSL
+ */
+typedef struct var_node{
     char* var_name;//variable name found in DSL query
-    void* object;//pt to object , type can be db, table, col, value array
+    char* var_type;//type used to cast var_object
+    void* var_object;//pt to object , type can be db, table, col, value array
+    struct var_node* next_var; //pt to next var_node
 }var_entry;
+
+/*-----------End of Type Definition of Struct-------------------*/
+
 
 #endif //BLUS_CS165_2015_BASE_DATA_STRUCTURE_H

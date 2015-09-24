@@ -22,70 +22,12 @@ SOFTWARE.
 
 #include "data_structure.h"
 
-/**
- * db_operator
- * The db_operator defines a database operation.  Generally, an operation will
- * be applied on column(s) of a table (SELECT, PROJECT, AGGREGATE) while other
- * operations may involve multiple tables (JOINS). The OperatorType defines
- * the kind of operation.
- *
- * In UNARY operators that only require a single table, only the variables
- * related to table1/column1 will be used.
- * In BINARY operators, the variables related to table2/column2 will be used.
- *
- * If you are operating on more than two tables, you should rely on separating
- * it into multiple operations (e.g., if you have to project on more than 2
- * tables, you should select in one operation, and then create separate
- * operators for each projection).
- *
- * Example query:
- * SELECT a FROM A WHERE A.a < 100;
- * db_operator op1;
- * op1.table1 = A;
- * op1.column1 = b;
- *
- * filter f;
- * f.value = 100;
- * f.type = LESS_THAN;
- * f.mode = NONE;
- *
- * op1.comparator = f;
- **/
-typedef struct db_operator {
-    // Flag to choose operator
-    OperatorType type;
-
-    // Used for every operator
-    table** tables;
-    column** columns;
-
-    // Internmediaties used for PROJECT, DELETE, HASH_JOIN
-    int *pos1;
-    // Needed for HASH_JOIN
-    int *pos2;
-
-    // For insert/delete operations, we only use value1;
-    // For update operations, we update value1 -> value2;
-    int *value1;
-    int *value2;
-
-    // This includes several possible fields that may be used in the operation.
-    Aggr agg;
-    comparator* c;
-
-} db_operator;
-
-typedef enum OpenFlags {
-    CREATE = 1,
-    LOAD = 2,
-} OpenFlags;
-
 /* OPERATOR API*/
 /**
  * open_db(filename, db, flags)
  * Opens the file associated with @filename and loads its contents into @db.
  *
- * If flags | Create, then it should create a new db.
+ * If flags | Create, then it should create a new table.
  * If flags | Load, then it should load the db with the incoming data.
  *
  * Note that the database in @filename MUST contain the same name as db->name
@@ -205,8 +147,9 @@ status create_index(column* col, IndexType type);
 status insert(column *col, int data);
 status delete(column *col, int *pos);
 status update(column *col, int *pos, int new_val);
-status col_scan(comparator *f, column *col, result **r);
-status index_scan(comparator *f, column *col, result **r);
+status col_scan(comparator* f, column* col, result** r);
+status index_scan(comparator* f, column* col, result** r);
+status fetch(column* col, int* pos, int length, result** r);
 
 /* Query API */
 status query_prepare(const char* query, db_operator** op);

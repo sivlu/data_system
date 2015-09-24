@@ -4,30 +4,99 @@
 
 #include "cs165_api.h"
 
+extern struct db_node *db_table;
 
-//not finished
+
 status open_db(const char* filename, db** database, OpenFlags flags){
+    //remember to update the global db linked list
+    //
+    //
     status res = {OK, NULL};
 
-    if (flags == CREATE){
-
-
-    }else if (flags == LOAD){
-
-    }else{
+    if (*database == NULL){
         res.code = ERROR;
-        res.error_message = "Flag not suppored.\n";
+        res.error_message = "Database is null.\n";
+    }else {
+        if (flags == CREATE) {
+
+
+        } else if (flags == LOAD) {
+
+        } else {
+            //may need to change later when having more flags
+            res.code = ERROR;
+            res.error_message = "Flag not suppored.\n";
+        }
     }
     return res;
 }
 
-status open_db(const char* filename, db** database, OpenFlags flags){
+/*
+ * remove db from table that keeps track of db
+ */
+static status remove_db_from_table(db* database){
+    status res = {OK, NULL};
+
+    db_node* prev = NULL;
+    db_node* temp = db_table;
+    while (temp != NULL){
+        if (temp->this_db->name == database->name){
+            if (temp == db_table){
+                //remove head
+                db_table = db_table->next;
+
+            }else{
+                prev->next = temp->next;
+            }
+            free(temp);
+            return res;
+        }
+        prev = temp;
+        temp = temp->next;
+    }
+    res.code = ERROR;
+    res.error_message = "Cannot find database in database table.\n";
+    return res;
+}
+
+static status rm_db_file(char* db_path){
+    //dir level
 
 }
+
+static status rm_table_file(char* table_path){
+    //dir level
+}
+
+static status rm_col_file(char* col_path){
+    //file level
+}
+
 
 status drop_db(db* database){
+    status res = {OK, NULL};
+    //remove the db from global linked list of db
+    res = remove_db_from_table(database);
+    if (res.code == ERROR) return res;
+    //free the tables in database
+    for (int i = 0; i<database->db_size; i++){
+        PosType curr_pos = database->tables_pos[i];
+        table* curr_table = database->tables[i];
+        if (*curr_pos == FULL) drop_table(database, curr_table);
+    }
+    //free database
+    free(database->tables_pos);
+    free(database->tables);
+    free(database);
+    //remove disk files associated with this database
+    //
+    //
+    //
 
+    return res;
 }
+
+
 
 status sync_db(db* database){
 
@@ -45,7 +114,7 @@ status create_db(const char* db_name, db** database){
         *database = (db*)malloc(sizeof(db));
         if (*database == NULL) {
             res.code = ERROR;
-            res.error_message = "Unable to allocate space for database\n";
+            res.error_message = "Unable to allocate space for database.\n";
             return res;
         }
     }
@@ -56,18 +125,18 @@ status create_db(const char* db_name, db** database){
     (*database)->tables = (table*)malloc(sizeof(table) * DB_SIZE); //total num of tables is DB_SIZE
     if ((*database)->tables == NULL){
         res.code = ERROR;
-        res.error_message = "Unable to allocate space in database\n";
+        res.error_message = "Unable to allocate space in database.\n";
         return res;
     }
-    (*database)->tables_pos = (FlagType*)malloc(sizeof(FlagType) * DB_SIZE); //array to keep track of tables
+    (*database)->tables_pos = (PosFlag*)malloc(sizeof(PosFlag) * DB_SIZE); //array to keep track of tables
     if ((*database)->tables_pos == NULL){
         free((*database)->tables); //free tables mem
         res.code = ERROR;
-        res.error_message = "Unable to allocate space in database\n";
+        res.error_message = "Unable to allocate space in database.\n";
         return res;
     }
     //initialize the pos array in db
-    FlagType* temp = (*database)->tables_pos;
+    PosFlag* temp = (*database)->tables_pos;
     for (int i = 0; i<DB_SIZE; ++i) *(temp++) = EMPTY;
     return res;
 }
@@ -94,7 +163,7 @@ status create_table(db* database, const char* name, size_t num_columns, table** 
     //table space allocation
     int final_pos;
     for (int i = 0; i<DB_SIZE; i++){
-        FlagType* pos = database->tables_pos[i];
+        PosFlag* pos = database->tables_pos[i];
         table* spot = database->tables[i];
         if (*pos == EMPTY) {
             if (*tb != NULL) free(*tb);
@@ -110,7 +179,7 @@ status create_table(db* database, const char* name, size_t num_columns, table** 
     (*tb)->tb_size = num_columns; //set the size of the table, ie num of cols
     (*tb)->col_length = COL_SIZE; //length of columns
 
-    (*tb)->cols_pos = (FlagType*)malloc(sizeof(FlagType)*num_columns); //total space for columns
+    (*tb)->cols_pos = (PosFlag*)malloc(sizeof(PosFlag)*num_columns); //total space for columns
     if ((*tb)->cols_pos == NULL){
         res.code = ERROR;
         res.error_message = "Unable to allocate space in table.\n";
@@ -124,7 +193,7 @@ status create_table(db* database, const char* name, size_t num_columns, table** 
         return res;
     }
     //initialize pos array in tb
-    FlagType* temp = (*tb)->cols_pos;
+    PosFlag* temp = (*tb)->cols_pos;
     for (int i= 0; i<num_columns; i++) *(temp++) = EMPTY;
     //update database, only update this when no error occurred
     database->table_count++;
@@ -138,7 +207,7 @@ status drop_table(db* database, table* tb){
     status res = {OK, NULL};
     //remove table from database
     for (int i = 0; i<database->db_size; i++){
-        FlagType* curr_pos = database->tables_pos[i];
+        PosFlag* curr_pos = database->tables_pos[i];
         table* curr_table = database->tables[i];
         if (*curr_pos == FULL && curr_table->name == tb->name){
             *curr_pos = EMPTY;
@@ -157,7 +226,7 @@ status create_column(table *tb, const char* name, column** col){
     status res = {OK, NULL};
     //unique col name checking
     for (int i = 0; i<tb->tb_size; ++i){
-        FlagType* curr_pos = tb->cols_pos[i];
+        PosFlag* curr_pos = tb->cols_pos[i];
         column* curr_col = tb->cols[i];
         if (*curr_pos == FULL && curr_col->name == name){
             res.code = ERROR;
@@ -174,7 +243,7 @@ status create_column(table *tb, const char* name, column** col){
     //assign space in table to col
     int final_pos;
     for (int i = 0; i<tb->tb_size; ++i){
-        FlagType* curr_pos = tb->cols_pos[i];
+        PosFlag* curr_pos = tb->cols_pos[i];
         column* curr_col = tb->cols[i];
         if (*curr_pos == EMPTY){
             if (*col != NULL) free(*col);
@@ -207,15 +276,74 @@ status insert(column *col, int data){
 }
 
 
+status col_scan(comparator *f, column *col, result **r){
+    status res = {OK, NULL};
+    //check if result is allocated
+    if (*r == NULL) *r = (result*)malloc(sizeof(result));
+    if (*r == NULL){
+        res.code = ERROR;
+        res.error_message = "Unable to allocate space for result.\n";
+        return res;
+    }
+    //scan the column
+    int temp_result[col->row_count]; //initialize a <vec_pos>
+    int count = 0; //actual count for the result
+    //
+    //
+    //
+    //
+    //
+    //
+    //
+    //initialize result
+    (*r)->payload = (int*)malloc(sizeof(int)*(count));
+    (*r)->num_tuples = count;
+    if ((*r)->payload == NULL){
+        res.code = ERROR;
+        res.error_message = "Unable to allocate space in result.\n";
+        return res;
+    }
+    //fetch data
+    status fetch_status = fetch(col, temp_result, count, r);
+    return fetch_status;
+
+}
+
+status fetch(column* col, int* pos, int length, result** r){
+    status res = {OK, NULL};
+    //check if result is allocated
+    if (*r == NULL) {
+        *r = (result *) malloc(sizeof(result));
+        if (*r == NULL) {
+            res.code = ERROR;
+            res.error_message = "Unable to allocate space for result.\n";
+            return res;
+        }
+    }
+    //check if result array is allocated
+    if ((*r)->payload == NULL){
+        (*r)->payload = (int*)malloc(sizeof(int)*length);
+        (*r)->num_tuples = length;
+        if ((*r)->payload == NULL){
+            res.code = ERROR;
+            res.error_message = "Unable to allocate space in result.\n";
+            return res;
+        }
+    }
+    //fetch the data
+    for (int i = 0; i<length; ++i){
+        *((*r)->payload[i]) = *(pos[i]);
+    }
+    return res;
+}
+
+
+
 status delete(column *col, int *pos){
 
 }
 
 status update(column *col, int *pos, int new_val){
-
-}
-
-status col_scan(comparator *f, column *col, result **r){
 
 }
 
