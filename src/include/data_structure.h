@@ -6,12 +6,21 @@
 #define BLUS_CS165_2015_BASE_DATA_STRUCTURE_H
 
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include "utils.h"
 
 /*-----------Start of Definition of Macros------------------- ----*/
 
+#define DEBUG 1 // flag for debug
 #define COL_SIZE 100 //number of values in a column
 #define DB_SIZE 10//number of tables in a db
 #define DATA_PATH "./data/" //default data path to store the data
+#define BUF_SIZE 1024 //buffer size for char array
+#define PATH_SIZE 256 //buffer size for a file name
+
 
 /*-----------End of Definition of Macros--------------------------*/
 
@@ -19,7 +28,7 @@
 /*-----------Start of Definition of Global Variables---------------*/
 
 /*
- * global var "var_table" is the table we keep track of DSL varibles
+ * global var "var_table" is the table we keep track of DSL variables
  */
 extern struct var_node* var_table;
 /*
@@ -35,7 +44,7 @@ extern struct db_node* db_table;
  * DataType
  * Flag to mark what type of data is held in the struct.
  * You can support additional types by including this enum and using void*
- * in place of int* in db_operator simliar to the way IndexType supports
+ * in place of int* in db_operator similar to the way IndexType supports
  * additional types.
  **/
 
@@ -98,7 +107,7 @@ typedef enum ComparatorType {
  *     f.mode = AND;
  *     f.col = col_b;
  *     f.next_comparator = &f_b;
- * For chains of more than two Juntions, left associative: "a | b & c | d"
+ * For chains of more than two Junctions, left associative: "a | b & c | d"
  * evaluated as "(((a | b) & c) | d)".
  **/
 typedef enum Junction {
@@ -135,12 +144,15 @@ typedef enum StatusCode {
     ERROR,
 } StatusCode;
 
-typedef enum OpenFlags {
+typedef enum OpenFlag {
     CREATE = 1,
     LOAD = 2,
 } OpenFlags;
 
-
+typedef enum ResultType{
+    POS, //positions
+    VAL, //values
+}ResultType;
 /*-----------End of Type Definition of Enums-----------------------*/
 
 
@@ -196,8 +208,8 @@ typedef struct column {
  * - col_count, the number of columns in the table
  * - cols_pos, pointer to an array of flags, determining if a col is taken or not
  * - cols, this is the pointer to an array of columns contained in the table.
- * - tb_size, the number of col this table can contain, defined as a macro
- * - col_length, the size of the columns in the table.
+ * - tb_size, the number of col this table can contain
+ * - col_length, the size of the columns in the table, defined as macro.
  **/
 typedef struct table {
     char* name;
@@ -251,6 +263,7 @@ typedef struct comparator {
 typedef struct result {
     size_t num_tuples;
     int *payload;
+    ResultType type;
 } result;
 
 
@@ -333,6 +346,11 @@ typedef struct var_node{
     void* var_object;//pt to object , type can be db, table, col, value array
     struct var_node* next_var; //pt to next var_node
 }var_entry;
+
+typedef struct file_node{
+    char* filename;
+    struct file_node* next;
+}file_node;
 
 /*-----------End of Type Definition of Struct-------------------*/
 
