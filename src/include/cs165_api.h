@@ -17,6 +17,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+
+/*
+ * NOTES:
+ *
+ * 1. sync_db function is replaced by write_db_file function
+ * 2. removed openflag for open_db, the default is to always
+ * load/overwrite the data in the file, no matter the tables exist or not
+ */
+
 #ifndef CS165_H
 #define CS165_H
 
@@ -28,7 +37,7 @@ SOFTWARE.
  * Opens the file associated with @filename and loads its contents into @db.
  *
  * If flags | Create, then it should create a new table.
- * If flags | Load, then it should load the db with the incoming data.
+ * If flags | Load, then it should load the table with the incoming data.
  *
  * Note that the database in @filename MUST contain the same name as db->name
  * (if db != NULL). If not, then return an error.
@@ -38,30 +47,14 @@ SOFTWARE.
  * flags   : the flags indicating the create/load options
  * returns : a status of the operation.
  */
-status open_db(const char* filename, db** database, OpenFlags flags);
+status open_db(const char* filename, db** database);
 
-/**
- * drop_db(db)
- * Drops the database associated with db.  You should permanently delete
- * the db and all of its tables/columns.
- *
- * db       : the database to be dropped.
- * returns  : the status of the operation.
- **/
-status drop_db(db* database);
 
-/**
- * sync_db(db)
- * Saves the current status of the database to disk.
- *
- * db       : the database to sync.
- * returns  : the status of the operation.
- **/
-status sync_db(db* database);
 
 /**
  * create_db(db_name, db)
  * Creates a database with the given database name, and stores the pointer in db
+ * Also add this db to global db_table
  *
  * db_name  : name of the database, must be unique.
  * db       : pointer to the db pointer. If *db == NULL, then create_db is
@@ -102,17 +95,6 @@ status create_db(const char* db_name, db** database);
 status create_table(db* database, const char* name, size_t num_columns, table** tb);
 
 /**
- * drop_table(db, table)
- * Drops the table from the db.  You should permanently delete
- * the table and all of its columns.
- *
- * db       : the database that contains the table.
- * table    : the table to be dropped.
- * returns  : the status of the operation.
- **/
-status drop_table(db* database, table* tb);
-
-/**
  * create_column(table, name, col)
  * Creates a column named @name in @table, and stores the pointer in @col.
  *
@@ -144,6 +126,34 @@ status create_column(table *tb, const char* name, column** col);
  **/
 status create_index(column* col, IndexType type);
 
+
+
+
+
+/**
+ * drop_db(db)
+ * Drops the database associated with db.  You should permanently delete
+ * the db and all of its tables/columns.
+ *
+ * db       : the database to be dropped.
+ * returns  : the status of the operation.
+ **/
+status drop_db(db* database, int del_file);
+/**
+ * drop_table(db, table)
+ * Drops the table from the db.  You should permanently delete
+ * the table and all of its columns.
+ *
+ * db       : the database that contains the table.
+ * table    : the table to be dropped.
+ * returns  : the status of the operation.
+ **/
+status drop_table(db* database, table* tb, int del_file);
+status drop_col(db* database, table* tb, column* col, int del_file);
+
+
+
+/* Operations API */
 status insert(column *col, int data);
 status delete(column *col, int *pos);
 status update(column *col, int *pos, int new_val);
@@ -154,6 +164,35 @@ status fetch(column* col, int* pos, int length, result** r);
 /* Query API */
 status query_prepare(const char* query, db_operator** op);
 status query_execute(db_operator* op, result** results);
+
+
+/* API related to opening connection*/
+status prepare_open_conn(char* data_path);
+static status read_db_file(const char* db_path, char* db_name);
+static status read_table_file(const char* table_path, char* table_name, db* database);
+static status read_col_file(const char* col_path, char* col_name, table* tb);
+static void free_list(file_node* head);
+/*
+ * This function list files/dirs in path
+ * and put them into a linked list of file_node
+ * Note that it ignores files starting with '.'
+ */
+static status list_files(char* path, file_node** head, int* count);
+
+
+
+/* API related to closing a connection*/
+status prepare_close_conn(char* data_path);
+static status write_db_file(const char* data_path, db* database);
+static status write_table_file(const char* db_path, table* tb);
+static status write_col_file(const char* table_path, column* col);
+
+
+/* static utility functions*/
+static status remove_db_from_dbtable(db* database);
+static status add_db_to_dbtable(db* database);
+static status remove_disk_file(char* file_path);
+
 
 
 #endif /* CS165_H */

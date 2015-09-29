@@ -6,64 +6,14 @@
 
 extern struct db_node *db_table;
 
-/*
- * write all db to file
- * free(drop) all db, table, col..
- */
-status prepare_close_conn(){
 
-}
-
-
-static void free_list(file_node* head){
-    file_node* temp = head;
-    while (temp){
-        file_node* next = temp->next;
-        free(temp->filename);
-        free(temp);
-        temp = next;
-    }
-}
 
 /*
- * This function list files/dirs in path
- * and put them into a linked list of file_node
- * Note that it ignores files starting with '.'
- */
-static status list_files(char* path, file_node** head, int* count){
-    status res = {OK, NULL};
-    DIR *dp;
-    struct dirent *ep;
-    file_node* temp = *head;
-
-    dp = opendir(path);
-    if (dp != NULL){
-        ep = readdir(dp);
-        while(ep != NULL){
-            if ((ep->d_name)[0]!='.'){
-                //append file to file list
-                if (*head == NULL){
-                    *head = (file_node*)malloc(sizeof(file_node));
-                    (*head)->filename = strdup(ep->d_name);
-                }else{
-                    temp->next = (file_node*)malloc(sizeof(file_node));
-                    temp->next->filename = strdup(ep->d_name);
-                    temp = temp->next;
-                }
-            }
-            ep = readdir(dp);
-        }
-    }else{
-        res.code = ERROR;
-        res.error_message = "Cannot open directory.\n";
-    }
-    return res;
-}
-
-/*
- * open data folder
+ * open data folder where we store all the data
  * read all db from data files into memory
- * for each db, read table and cols
+ * for each db, read table
+ * for each table read all the cols
+ * NOTE: associated static functions: read_db_file, read_table_file, read_col_file
  */
 status prepare_open_conn(char* data_path){
     status res = {OK, NULL};
@@ -94,10 +44,7 @@ status prepare_open_conn(char* data_path){
     return res;
 }
 
-/*
- * call create db, then for each table dir, call read_table_file
- */
-status read_db_file(const char* db_path, char* db_name){
+static status read_db_file(const char* db_path, char* db_name){
     status res = {OK, NULL};
 
     db* database; //NOTE: check for memory errors afterwards
@@ -126,7 +73,7 @@ status read_db_file(const char* db_path, char* db_name){
     return res;
 }
 
-status read_table_file(const char* table_path, char* table_name, db* database){
+static status read_table_file(const char* table_path, char* table_name, db* database){
     status res ={OK, NULL};
 
     table* tb;
@@ -153,7 +100,7 @@ status read_table_file(const char* table_path, char* table_name, db* database){
     return res;
 }
 
-status read_col_file(const char* col_path, char* col_name, table* tb){
+static status read_col_file(const char* col_path, char* col_name, table* tb){
     status res = {OK, NULL};
 
     column* col;
@@ -176,145 +123,80 @@ status read_col_file(const char* col_path, char* col_name, table* tb){
     return res;
 }
 
+static void free_list(file_node* head){
+    file_node* temp = head;
+    while (temp){
+        file_node* next = temp->next;
+        free(temp->filename);
+        free(temp);
+        temp = next;
+    }
+}
 
-status open_db(const char* filename, db** database, OpenFlag flags){
-    //remember to update the global db linked list
-    //
-    //
-    //
-    //
+static status list_files(char* path, file_node** head, int* count){
     status res = {OK, NULL};
+    DIR *dp;
+    struct dirent *ep;
+    file_node* temp = *head;
 
-    if (*database == NULL){
-        res.code = ERROR;
-        res.error_message = "Database is null.\n";
-    }else {
-        if (flags == CREATE) {
-
-
-        } else if (flags == LOAD) {
-
-        } else {
-            //may need to change later when having more flags
-            res.code = ERROR;
-            res.error_message = "Flag not suppored.\n";
+    dp = opendir(path);
+    if (dp != NULL){
+        ep = readdir(dp);
+        while(ep != NULL){
+            if ((ep->d_name)[0]!='.'){
+                //append file to file list
+                if (*head == NULL){
+                    *head = (file_node*)malloc(sizeof(file_node));
+                    (*head)->filename = strdup(ep->d_name);
+                }else{
+                    temp->next = (file_node*)malloc(sizeof(file_node));
+                    temp->next->filename = strdup(ep->d_name);
+                    temp = temp->next;
+                }
+            }
+            ep = readdir(dp);
         }
+    }else{
+        res.code = ERROR;
+        res.error_message = "Cannot open directory.\n";
     }
     return res;
 }
 
+
+
 /*
- * remove db from db table that keeps track of db
+ * clean the data folder for overwrite
+ * look for db on variable "db_table"
+ * write all db to file
+ * free all db, table, col in memory..
  */
-static status remove_db_from_dbtable(db* database){
+status prepare_close_conn(char* data_path){
     status res = {OK, NULL};
 
-    db_node* prev = NULL;
+    //clean the data folder first
+    char cmd[PATH_SIZE];
+    strcpy(cmd, "rm -rf ");
+    strcat(cmd, data_path);
+    strcat(cmd, "*"); //cmd = "rm -rf ./data/*"
+    int r = system(cmd);
+    if (r < 0) {
+        res.code = ERROR;
+        res.error_message = "Error in cleaning data folder.\n";
+        return res;
+    }
+    //for each existing db, write that db to file
     db_node* temp = db_table;
     while (temp != NULL){
-        if (strcmp(temp->this_db->name, database->name) == 0){
-            if (temp == db_table){
-                //remove head
-                db_table = db_table->next;
-
-            }else{
-                prev->next = temp->next;
-            }
-            free(temp);
-            return res;
-        }
-        prev = temp;
+        res = write_db_file(data_path, temp->this_db);
+        if (res.code == ERROR) return res;
         temp = temp->next;
     }
+    //destroy all allocated space for global vars
+    free_before_closing();
 
-    res.code = ERROR;
-    res.error_message = "Cannot find database in database table.\n";
     return res;
 }
-/*
- * execute command line to remove the dir/file of db/tb/col
- */
-static status remove_disk_file(char* path){
-    status res = {OK, NULL};
-    //create command to rm the db dir
-    char cmd[BUF_SIZE];
-    strcpy(cmd, "rm -rf ");
-    strcat(cmd, db_path);
-    int val = system(cmd);
-    if (val < 0){
-        res.code = ERROR;
-        res.error_message = "Error removing path.\n";
-    }
-    return res;
-}
-
-
-/*
- * write a column to disk file
- * table_path: the path of the table where the col is
- * col: pointer to the col
- */
-static status write_col_file(const char* table_path, column* col){
-    status res = {OK, NULL};
-
-    //create path
-    char filename[BUF_SIZE];
-    strcpy(filename, table_path);
-    strcat(filename, col->name);
-    //open a file and write
-    FILE* f  = fopen(path, "w);
-    if (f == NULL){
-        res.code = ERROR;
-        res.error_message = "Error opening file.\n";
-        return res;
-    }
-    //NOTE: may need to change, as some rows may not contain data
-    //or we need to read data from somewhere else
-    for (int i = 0; i<col->row_count; ++i) {
-        int* data = col->data[i];
-        fprintf(f, "%d\n", *data);
-    }
-    fclose(f);
-    return res;
-}
-
-/*
- * write a table to disk file
- * db_path: path to db where this table is in
- * tb: pointer to table
- */
-static status write_table_file(const char* db_path, table* tb){
-    status res = {OK, NULL};
-
-    //create command
-    char path[BUF_SIZE];
-    char cmd[BUF_SIZE];
-    strcpy(path, db_path);
-    strcat(path, tb->name);
-    strcat(path, "/"); //convention
-    strcpy(path, "mkdir ");
-    strcat(path, path);
-
-    //create table folder using cmd
-    int r = system(cmd);
-    if (r < 0){
-        res.code = ERROR;
-        res.error_message = "Error creating table folder\n";
-        return res;
-    }
-
-    //for each column, create a file
-    for (int i = 0; i<tb->tb_size; i++){
-        PosFlag* curr_pos = tb->cols_pos[i];
-        column* curr_col = tb->cols[i];
-        if (*curr_pos == FULL) {
-            res = write_col_file(path, curr_col);
-            if (res.code == ERROR) return res;
-        }
-    }
-    return res;
-}
-
 /*
  * write a database to file
  * data_path: data dir that contains the db
@@ -351,12 +233,166 @@ static status write_db_file(const char* data_path, db* database){
     }
     return res;
 }
+/*
+ * write a table to disk file
+ * db_path: path to db where this table is in
+ * tb: pointer to table
+ */
+static status write_table_file(const char* db_path, table* tb){
+    status res = {OK, NULL};
+
+    //create command
+    char path[BUF_SIZE];
+    char cmd[BUF_SIZE];
+    strcpy(path, db_path);
+    strcat(path, tb->name);
+    strcat(path, "/"); //convention
+    strcpy(path, "mkdir ");
+    strcat(path, path);
+
+    //create table folder using cmd
+    int r = system(cmd);
+    if (r < 0){
+        res.code = ERROR;
+        res.error_message = "Error creating table folder\n";
+        return res;
+    }
+
+    //for each column, create a file
+    for (int i = 0; i<tb->tb_size; i++){
+        PosFlag* curr_pos = tb->cols_pos[i];
+        column* curr_col = tb->cols[i];
+        if (*curr_pos == FULL) {
+            res = write_col_file(path, curr_col);
+            if (res.code == ERROR) return res;
+        }
+    }
+    return res;
+}
+/*
+ * write a column to disk file
+ * table_path: the path of the table where the col is
+ * col: pointer to the col
+ */
+static status write_col_file(const char* table_path, column* col){
+    status res = {OK, NULL};
+
+    //create path
+    char filename[BUF_SIZE];
+    strcpy(filename, table_path);
+    strcat(filename, col->name);
+    //open a file and write
+    FILE* f  = fopen(path, "w");
+    if (f == NULL){
+        res.code = ERROR;
+        res.error_message = "Error opening file.\n";
+        return res;
+    }
+    //NOTE: may need to change, as some rows may not contain data
+    //or we need to read data from somewhere else
+    for (int i = 0; i<col->row_count; ++i) {
+        int* data = col->data[i];
+        fprintf(f, "%d\n", *data);
+    }
+    fclose(f);
+    return res;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
- *
+ * remove db from db table that keeps track of db
  */
-status drop_db(db* database){
+static status remove_db_from_dbtable(db* database){
+    status res = {OK, NULL};
+
+    db_node* prev = NULL;
+    db_node* temp = db_table;
+    while (temp != NULL){
+        if (strcmp(temp->this_db->name, database->name) == 0){
+            if (temp == db_table){
+                //remove head
+                db_table = db_table->next;
+
+            }else{
+                prev->next = temp->next;
+            }
+            free(temp);
+            return res;
+        }
+        prev = temp;
+        temp = temp->next;
+    }
+
+    res.code = ERROR;
+    res.error_message = "Cannot find database in database table.\n";
+    return res;
+}
+
+static status add_db_to_dbtable(db* database){
+    status res = {OK, NULL};
+
+    //allocate space for a new db_node
+    db_node* node = (db_node*)malloc(sizeof(db_node));
+    if (node == NULL){
+        res.code = ERROR;
+        sprintf(res.error_message, "Unable to allocate space for db_node [%s]\n", database->name);
+        return res;
+    }
+    node->this_db = database;
+
+    //add this node to db_table
+    if (db_table == NULL){
+        //if db table is empty
+        db_table = node;
+    }else{
+        //else append this node
+        db_node* temp = db_table;
+        while (temp->next != NULL) temp = temp->next;
+        temp->next = node;
+    }
+    return res;
+}
+
+/*
+ * execute command line to remove the dir/file of db/tb/col
+ */
+static status remove_disk_file(char* file_path){
+    status res = {OK, NULL};
+    //create command to rm the db dir
+    char cmd[BUF_SIZE];
+    strcpy(cmd, "rm -rf ");
+    strcat(cmd, file_path);
+    int val = system(cmd);
+    if (val < 0){
+        res.code = ERROR;
+        res.error_message = "Error removing path.\n";
+    }
+    return res;
+}
+
+
+
+
+
+
+/*
+ * remove database from memory and from the db table
+ * if del_file flag is 1, delete the db disk folder
+ */
+status drop_db(db* database, int del_file){
     status res = {OK, NULL};
     //remove the db from global linked list of db
     res = remove_db_from_table(database);
@@ -365,144 +401,67 @@ status drop_db(db* database){
     for (int i = 0; i<database->db_size; i++){
         PosType curr_pos = database->tables_pos[i];
         table* curr_table = database->tables[i];
-        if (*curr_pos == FULL) drop_table(database, curr_table);
+        if (*curr_pos == FULL) {
+            //just delete table in memory
+            //since if del_file is on
+            //we can remove the whole folder later
+            res = drop_table(database, curr_table, 0);
+            if (res.code == ERROR) return res;
+        }
     }
-    //free database
+
+    //remove disk file of db if del_file == 1
+    if (del_file){
+        char path[PATH_SIZE];
+        strcpy(path, DATA_PATH);
+        strcat(path, database->name);
+        res = remove_disk_file(path);
+        if (res.code == ERROR) return res;
+    }
+
+    //free allocated space in database
     free(database->tables_pos);
     free(database->tables);
     free(database->name);
     free(database);
 
-    //remove disk file of db
-    //
-    //
-    //
-    //
-
-    return res;
-}
-
-
-
-status sync_db(db* database){
-
-}
-
-status create_db(const char* db_name, db** database){
-    status res = {OK, NULL};
-
-    //name checking: unique db name
-    //
-    //missing///////
-    //
-    //pointer checking: database space allocation
-    if (*database == NULL) {
-        *database = (db*)malloc(sizeof(db));
-        if (*database == NULL) {
-            res.code = ERROR;
-            res.error_message = "Unable to allocate space for database.\n";
-            return res;
-        }
-    }
-    //create database -- assign values
-    (*database)->table_count = 0; //right now there is no table in it
-    (*database)->db_size = DB_SIZE; //assign the database size
-    //malloc space in db and check return value
-    (*database)->name = strdup(db_name); //malloc and copy the name
-    if ((*database)->name == NULL || (*database)->tables == NULL || (*database)->tables_pos == NULL){
-        if ((*database)->name != NULL) free((*database)->name);
-        if ((*database)->tables != NULL) free((*database)->tables);
-        if ((*database)->tables_pos != NULL) free((*database)->tables_pos));
-
-        res.code = ERROR;
-        res.error_message = "Unable to allocate space in database.\n";
-        return res;
-    }
-    //initialize the pos array in db
-    PosFlag* temp = (*database)->tables_pos;
-    for (int i = 0; i<DB_SIZE; ++i) *(temp++) = EMPTY;
-    return res;
-}
-
-
-//NOTE: assume db has enough space for tb
-status create_table(db* database, const char* name, size_t num_columns, table** tb){
-    status res = {OK, NULL};
-
-    //unique table name checking
-    for (int i = 0; i<database->db_size; i++){
-        if (database->tables_pos[i] == FULL && database->tables[i].name == name){
-            res.code = ERROR;
-            res.error_message = "Table name already exsits in database.\n";
-            return res;
-        }
-    }
-    //db size checking
-    if (database->table_count == database->db_size){
-        res.code = ERROR;
-        res.error_message = "Not enough space in database.\n";
-        return res;
-    }
-    //table space allocation
-    int final_pos;
-    for (int i = 0; i<DB_SIZE; i++){
-        PosFlag* pos = database->tables_pos[i];
-        table* spot = database->tables[i];
-        if (*pos == EMPTY) {
-            if (*tb != NULL) free(*tb);
-            *tb = spot; //assign tb to this spot
-            final_pos = i; //keep track of the index
-            break;
-        }
-        pos++;
-    }
-    //create the table
-    (*tb)->col_count = 0; //no columns yet
-    (*tb)->tb_size = num_columns; //set the size of the table, ie num of cols
-    (*tb)->col_length = COL_SIZE; //length of columns
-    //allocate space in table and check result
-    (*tb)->name = strdup(name); //table name
-    (*tb)->cols_pos = (PosFlag*)malloc(sizeof(PosFlag)*num_columns); //total space for columns
-    (*tb)->cols = (column*)malloc(sizeof(column)*num_columns);
-    if ((*tb)->cols == NULL || (*tb)->cols_pos==NULL || (*tb)->name == NULL){
-        if ((*tb)->cols != NULL) free((*tb)->cols);
-        if ((*tb)->name != NULL) free((*tb)->name);
-        if ((*tb)->cols_pos != NULL) free((*tb)->cols_pos);
-        res.code = ERROR;
-        res.error_message = "Unable to allocate space in table.\n";
-        return res;
-    }
-    //initialize pos array in tb
-    PosFlag* temp = (*tb)->cols_pos;
-    for (int i= 0; i<num_columns; i++) *(temp++) = EMPTY;
-    //update database, only update this when no error occurred
-    database->table_count++;
-    *(database->tables_pos[final_pos]) = FULL; //make flag 1 at pos
-
     return res;
 }
 
 //NOTE: assume tb in database, tb is not null
-status drop_table(db* database, table* tb){
+status drop_table(db* database, table* tb, int del_file){
     status res = {OK, NULL};
     //remove table from database
     for (int i = 0; i<database->db_size; i++){
         PosFlag* curr_pos = database->tables_pos[i];
         table* curr_table = database->tables[i];
-        if (*curr_pos == FULL && curr_table->name == tb->name){
+        if (*curr_pos == FULL && strcmp(curr_table->name,tb->name)==0){
             *curr_pos = EMPTY;
             database->table_count--;
             break;
         }
     }
     //delete each col
-    for (int i = 0; i<tb->cols_pos; i++){
+    for (int i = 0; i<tb->tb_size; i++){
         PosFlag* curr_pos = tb->cols_pos[i];
         col* curr_col = tb->cols[i];
         if (*curr_pos == FULL){
-            drop_column(tb, curr_col);
+            drop_column(database, tb, curr_col, 0);
         }
     }
+
+    //delete table file on disk if needed
+    if (del_file){
+        char filepath[PATH_SIZE];
+        strcpy(filepath, DATA_PATH);
+        strcat(filepath, database->name);
+        strcat(filepath,"/");
+        strcat(filepath, tb->name);
+        strcat(filepath, "/");
+        res = remove_disk_file(filepath);
+        if (res.code == ERROR) return res;
+    }
+
     //free allocated space in table
     free(tb->name);
     free(tb->cols);
@@ -512,55 +471,8 @@ status drop_table(db* database, table* tb){
     return res;
 }
 
-status create_column(table *tb, const char* name, column** col){
-    status res = {OK, NULL};
-    //unique col name checking
-    for (int i = 0; i<tb->tb_size; ++i){
-        PosFlag* curr_pos = tb->cols_pos[i];
-        column* curr_col = tb->cols[i];
-        if (*curr_pos == FULL && strcmp(curr_col->name,name) == 0){
-            res.code = ERROR;
-            res.error_message = "Column name already exists in table.\n";
-            return res;
-        }
-    }
-    //table space checking
-    if (tb->col_count == tb->tb_size){
-        res.code = ERROR;
-        res.error_message = "Not enough space in table.\n";
-        return res;
-    }
-    //assign space in table to col
-    int final_pos;
-    for (int i = 0; i<tb->tb_size; ++i){
-        PosFlag* curr_pos = tb->cols_pos[i];
-        column* curr_col = tb->cols[i];
-        if (*curr_pos == EMPTY){
-            if (*col != NULL) free(*col);
-            *col = curr_col;
-            final_pos = i;
-            break;
-        }
-    }
-    //create this column
-    (*col)->row_count = 0; //empty col, next availble pos for data is at 0
-    //allocate space in column
-    (*col)->name = strdup(name); //assign col name
-    (*col)->data = (int*)malloc(sizeof(int)*tb->col_length); //malloc space for this col
-    if ((*col)->data == NULL || (*col)->name == NULL){
-        if ((*col)->data != NULL) free((*col)->data);
-        if ((*col)->name != NULL) free((*col)->name);
-        res.code = ERROR;
-        res.error_message = "Unable to allocate space in column.\n";
-        return res;
-    }
-    //update table information
-    *(tb->cols_pos[final_pos]) = FULL;
-    tb->col_count++;
-    return res;
-}
-
-status drop_col(table* tb, column* col){
+//NOTE: DSL may not have query to do this, but it's non-static anyways
+status drop_col(db* database, table* tb, column* col, int del_file){
     status res = {OK, NULL};
     //remove col from tb
     for (int i = 0; i<tb->tb_size; i++){
@@ -572,18 +484,289 @@ status drop_col(table* tb, column* col){
             break;
         }
     }
-    //remove actual col
+
+    //delete col file on disk if needed
+    if (del_file){
+        char filepath[PATH_SIZE];
+        strcpy(filepath, DATA_PATH);
+        strcat(filepath, database->name);
+        strcat(filepath,"/");
+        strcat(filepath, tb->name);
+        strcat(filepath, "/");
+        strcat(filepath, col->name);
+        res = remove_disk_file(filepath);
+        if (res.code == ERROR) return res;
+    }
+
+    //remove allocated space in col
     free(col->name);
     free(col->data);
 
     return res;
 }
 
+status create_db(const char* db_name, db** database){
+    status res = {OK, NULL};
+
+    //name checking: unique db name
+    db_node* temp = db_table;
+    while (temp != NULL){
+        if (strcmp(temp->this_db->name, db_name) == 0){
+            res.code = ERROR;
+            sprintf(res.error_message, "Database name [%s] already exists.\n", db_name);
+            return res;
+        }
+        temp = temp->next;
+    }
+
+    //pointer checking: database space allocation
+    if (*database == NULL) {
+        *database = (db*)malloc(sizeof(db));
+        if (*database == NULL) {
+            res.code = ERROR;
+            sprintf(res.error_message, "Unable to allocate space for db [%s].\n", db_name);
+            return res;
+        }
+    }
+
+    //malloc space in db and check return value
+    (*database)->name = strdup(db_name); //malloc and copy the name
+    (*database)->tables = (table*)malloc(sizeof(table)*DB_SIZE);
+    (*database)->tables_pos = (PosFlag*)malloc(sizeof(PosFlag)*DB_SIZE);
+    if ((*database)->name == NULL || (*database)->tables == NULL || (*database)->tables_pos == NULL){
+        if ((*database)->name != NULL) free((*database)->name);
+        if ((*database)->tables != NULL) free((*database)->tables);
+        if ((*database)->tables_pos != NULL) free((*database)->tables_pos);
+
+        res.code = ERROR;
+        sprintf(res.error_message, "Unable to allocate space in db [%s].\n", db_name);
+        return res;
+    }
+
+    //initialize fields in db
+    (*database)->table_count = 0; //right now there is no table in it
+    (*database)->db_size = DB_SIZE; //assign the database size
+    PosFlag* temp = (*database)->tables_pos;
+    for (int i = 0; i<DB_SIZE; ++i) *(temp++) = EMPTY;
+
+    //add db in db_table
+    res = add_db_to_dbtable(*database);
+    if (res.code == ERROR) return res; //keep this if-statement, may modify later
+
+    return res;
+}
+
+
+//NOTE: assume db has enough space for tb
+status create_table(db* database, const char* name, size_t num_columns, table** tb){
+    status res = {OK, NULL};
+
+    //unique table name checking
+    for (int i = 0; i<database->db_size; i++){
+        table* curr_table = database->tables[i];
+        PosFlag* curr_pos = database->tables_pos[i];
+        if (*curr_pos == FULL && strcmp(curr_table->name, name) == 0){
+            res.code = ERROR;
+            sprintf(res.error_message, "Table [%s] already exsits in database [%s].\n", name, database->name);
+            return res;
+        }
+    }
+    //db size checking
+    if (database->table_count == database->db_size){
+        res.code = ERROR;
+        sprintf(res.error_message, "Database [%s] is full.\n", database->name);
+        return res;
+    }
+    //table space allocation
+    int final_pos;
+    for (int i = 0; i<DB_SIZE; i++){
+        PosFlag* pos = database->tables_pos[i];
+        table* spot = database->tables[i];
+        if (*pos == EMPTY) {
+            if (*tb != NULL && *tb != spot) free(*tb);
+            *tb = spot; //assign tb to this spot
+            final_pos = i; //keep track of the index
+            break;
+        }
+    }
+
+    //allocate space in table and check result
+    (*tb)->name = strdup(name); //table name
+    (*tb)->cols_pos = (PosFlag*)malloc(sizeof(PosFlag)*num_columns); //total space for columns
+    (*tb)->cols = (column*)malloc(sizeof(column)*num_columns);
+    if ((*tb)->cols == NULL || (*tb)->cols_pos==NULL || (*tb)->name == NULL){
+        if ((*tb)->cols != NULL) free((*tb)->cols);
+        if ((*tb)->name != NULL) free((*tb)->name);
+        if ((*tb)->cols_pos != NULL) free((*tb)->cols_pos);
+        res.code = ERROR;
+        sprintf(res.error_message, "Unable to allocate space in table [%s].\n", name);
+        return res;
+    }
+    //initialize fields in tb
+    (*tb)->col_count = 0; //no columns yet
+    (*tb)->tb_size = num_columns; //set the size of the table, ie num of cols
+    (*tb)->col_length = COL_SIZE; //length of columns
+    PosFlag* temp = (*tb)->cols_pos;
+    for (int i= 0; i<num_columns; i++) *(temp++) = EMPTY;
+
+    //update database at end cuz we want only update this when no error occurred
+    database->table_count++;
+    *(database->tables_pos[final_pos]) = FULL; //make flag 1 at pos
+
+    return res;
+}
+
+
+status create_column(table* tb, const char* name, column** col){
+    status res = {OK, NULL};
+
+    //unique col name checking
+    for (int i = 0; i<tb->tb_size; ++i){
+        PosFlag* curr_pos = tb->cols_pos[i];
+        column* curr_col = tb->cols[i];
+        if (*curr_pos == FULL && strcmp(curr_col->name, name) == 0){
+            res.code = ERROR;
+            sprintf(res.error_message, "Column [%s] already exists in table [%s].\n", name, tb->name);
+            return res;
+        }
+    }
+
+    //table space checking
+    if (tb->col_count == tb->tb_size){
+        res.code = ERROR;
+        sprintf(res.error_message, "Table [%s] is full.\n", tb->name);
+        return res;
+    }
+
+    //assign space in table to col
+    int final_pos;
+    for (int i = 0; i<tb->tb_size; ++i){
+        PosFlag* curr_pos = tb->cols_pos[i];
+        column* curr_col = tb->cols[i];
+        if (*curr_pos == EMPTY){
+            if (*col != NULL && *col != curr_col) free(*col);
+            *col = curr_col;
+            final_pos = i;
+            break;
+        }
+    }
+
+    //allocate space in column
+    (*col)->name = strdup(name); //malloc and assign col name
+    (*col)->data = (int*)malloc(sizeof(int)*tb->col_length); //malloc space for this col
+    (*col)->index = (column_index*)malloc(sizeof(column_index)*tb->col_length);//malloc for index
+    if ((*col)->data == NULL || (*col)->name == NULL || (*col)->index == NULL){
+        if ((*col)->data != NULL) free((*col)->data);
+        if ((*col)->name != NULL) free((*col)->name);
+        if ((*col)->index != NULL) free((*col)->index);
+        res.code = ERROR;
+        sprintf(res.error_message, "Unable to allocate space in column [%s].\n", name);
+        return res;
+    }
+    //initialize fields in col
+    (*col)->row_count = 0; //empty col, next available pos for data is at 0
+    //update table information
+    *(tb->cols_pos[final_pos]) = FULL;
+    tb->col_count++;
+    return res;
+}
+
+
+
+
+
+
+// ---------start of not finished..------------------
+
+
+//NOTE: assume file in correct format
+status open_db(const char* filename, db** database){
+    status res = {OK, NULL};
+
+    if (*database == NULL){
+        res.code = ERROR;
+        sprintf(res.error_message,"Database [%s] does not exist.\n", (*database)->name);
+    }else {
+        tb_col* headers;
+        res = find_all_table_cols(filename, &headers, *database);
+        //
+        //
+        //
+        free(headers);
+    }
+    return res;
+}
+
+
+
+static status find_all_table_cols(const char* filename, tb_col** headers, db* database){
+    status res = {OK, NULL};
+
+    //read first line of file and parse into tb and col names
+    char *tb_names, *col_names;
+    int count = 0;
+    int len = 0;
+    FILE* f = fopen(filename, "r");
+    char* title = NULL;
+    if (getline(&title, &len, f) == -1){
+        res.code = ERROR;
+        sprintf(res.error_message, "Unable to read file [%s].\n", filename);
+        return res;
+    }
+    parse_and_find_names(title, &tb_names, &col_names, &count);
+    fclose(f);
+    free(title);
+    //create create tables and cols as needed
+
+    //construct headers
+    *headers = (tb_col*)malloc(sizeof(tb_col)*count);
+    for (int i = 0; i<count; ++i){
+
+
+    }
+
+
+
+}
+
+static void parse_and_find_names(char* title, char** tb_names, char** col_names, int* count){
+
+}
+
+static void* contains(void* container, char* name, int db_contains_tb){
+    //if container contains name, returns pointer to that item
+    //else return NULL
+    void* temp;
+    PosFlag* pos;
+    int len;
+    if (db_contains_tb){
+        //db tb relation
+        container = (db*)container;
+        temp = (table*)container->tables;
+        pos = container->tables_pos;
+        len = container->db_size;
+    }else{
+        //tb col relation
+        container = (table*)container;
+        temp = (col*)container->cols;
+        pos = container->cols_pos;
+        len = container->tb_size;
+    }
+    for (int i = 0; i<len; ++i){
+        if (*(pos[i]) == FULL && strcmp((temp[i])->name, name) == 0) return temp;
+    }
+    return NULL;
+}
+
+
+
+
 //assume enough space in col,
 //might need to change the API later to include the len of col for checking
 status insert(column *col, int data){
     status res = {OK, NULL};
     *(col->data[col->row_count]) = data;
+    col->row_count++;
     return res;
 }
 

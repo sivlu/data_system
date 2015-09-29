@@ -244,7 +244,7 @@ typedef struct db {
  */
 typedef struct status {
     StatusCode code;
-    char* error_message;
+    char error_message[BUF_SIZE];
 } status;
 
 /**
@@ -351,6 +351,15 @@ typedef struct file_node{
     char* filename;
     struct file_node* next;
 }file_node;
+
+/*
+ * this struct is used in open_db with reading in a file
+ * this stores all the cols and associated tables from that file
+ */
+typedef struct tb_col{
+    table* tb;
+    column* col;
+}tb_col;
 
 /*-----------End of Type Definition of Struct-------------------*/
 
