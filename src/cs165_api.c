@@ -672,11 +672,19 @@ status create_column(table* tb, const char* name, column** col){
 }
 
 
+//assume enough space in col,
+//might need to change the API later to include the len of col for checking
+status insert(column *col, int data){
+    status res = {OK, NULL};
+    *(col->data[col->row_count]) = data;
+    col->row_count++;
+    return res;
+}
 
 
 
 
-// ---------start of not finished..------------------
+
 
 
 //NOTE: assume file in correct format
@@ -687,50 +695,131 @@ status open_db(const char* filename, db** database){
         res.code = ERROR;
         sprintf(res.error_message,"Database [%s] does not exist.\n", (*database)->name);
     }else {
-        tb_col* headers;
-        res = find_all_table_cols(filename, &headers, *database);
-        //
-        //
-        //
-        free(headers);
+        column* cols;
+        int count = 0;
+        int len = 0;
+        char* line = NULL;
+        FILE f = fopen(filename, 'r');
+        if (f == NULL){
+            res.code = ERROR;
+            sprintf(res.error_message, "Unable to open file [%s].\n", filename);
+            return res;
+        }
+        if (getline(&line, &len, f) == -1){
+            res.code = ERROR;
+            sprintf(res.error_message, "Unable to read file [%s].\n", filename);
+            return res;
+        }
+        //get all the cols and count of cols
+        res = find_all_cols(line, &cols, &count, *database);
+        if (res.code == ERROR) return res;
+        //read each line of data, parse and insert
+        while (getline(&line, &len, f) != -1) {
+            char* copy = strdup(line);
+            char* delim = ",";
+            char* token = strtok(copy, delim);
+            int i = 0;
+            while(token){
+                insert(cols[i++], atoi(token));
+                token = strtok(NULL, delim);
+            }
+            free(copy);
+        }
+        //clean up
+        fclose(f);
+        free(line);
     }
     return res;
 }
 
 
-
-static status find_all_table_cols(const char* filename, tb_col** headers, db* database){
+/*
+ * parse header line into list of table names and list of col names
+ * create each table and cols in each table
+ * modify headers to make it contains pointers to tables and cols
+ */
+static status find_all_table_cols(const char* filename, column** cols, int* count, db* database){
     status res = {OK, NULL};
 
-    //read first line of file and parse into tb and col names
-    char *tb_names, *col_names;
-    int count = 0;
-    int len = 0;
-    FILE* f = fopen(filename, "r");
-    char* title = NULL;
-    if (getline(&title, &len, f) == -1){
+    //find number of cols
+    *count = parse_and_find_count(line);
+    //find names of tables, cols
+    char tb_name[*count][NAME_SIZE], col_name[*count][NAME_SIZE];
+    parse_and_find_names(title, tb_names, col_names);
+    //find pointer to cols
+    *cols = (column*)malloc(sizeof(column)*(*count));
+    if (*cols == NULL){
         res.code = ERROR;
-        sprintf(res.error_message, "Unable to read file [%s].\n", filename);
+        sprintf(res.error_message, "Unable to allocate space for cols.\n");
         return res;
     }
-    parse_and_find_names(title, &tb_names, &col_names, &count);
-    fclose(f);
-    free(title);
-    //create create tables and cols as needed
+    create_and_find_cols(database, tb_name, col_name, cols, *count);
 
-    //construct headers
-    *headers = (tb_col*)malloc(sizeof(tb_col)*count);
-    for (int i = 0; i<count; ++i){
-
-
-    }
-
-
-
+    return res;
 }
 
-static void parse_and_find_names(char* title, char** tb_names, char** col_names, int* count){
+static int parse_and_find_count(const char* title){
+    char* copy = strdup(title);
+    int count = 0;
+    char* token = strtok(copy, ",");
+    while (token){
+        count++;
+        token = strtok(NULL, ",");
+    }
+    free(copy);
+    return count;
+}
 
+static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE]){
+    char* copy = strdup(title);
+    char* delim = ",";
+    char* token = strtok(copy, delim);
+    int i = 0;
+    while (token){
+        char* token_cp = strdup(token);
+        strtok(token_cp, "."); //db name, we don't care
+        strcpy(tb_names[i],strtok(NULL, ".")); //copy tb name
+        strcpy(col_names[i++],strtok(NULL, ".")); //col name
+        free(token_cp);
+        token = strtok(NULL, delim);
+    }
+    free(copy);
+}
+
+//might be problematic
+static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count){
+    int col_count[count];
+    char tb_count[count][NAME_SIZE];
+    int table_count = 0;
+    //count how many columns in one table
+    for (int i = 0; i<count; ++i){
+        //see if the table name appeared before
+        int found = 0;
+        for (int j = 0; j<table_count; ++j){
+            if (strcmp(tb_count[j],tb_names[i]) == 0){
+                col_count[j]++;
+                found = 1;
+                break;
+            }
+        }
+        //if not found, add it to the tb_count table
+        if (!found) {
+            strcpy(tb_count[table_count], tb_names[i]);
+            col_count[table_count] = 1;
+            table_count++;
+        }
+    }
+    //for each table in tb_count, create it
+    for (int i = 0; i<table_count; i++){
+        table* tb = NULL;
+        create_table(database,tb_count[i], col_count[i], &tb);
+        //for each col in table, create the col
+        for (int j = 0 ; j<count; ++j){
+            if (strcmp(tb_names[j],tb_count[i])==0){
+                create_column(tb, col_names[j], &(*cols[j]));
+            }
+        }
+    }
 }
 
 static void* contains(void* container, char* name, int db_contains_tb){
@@ -761,28 +850,26 @@ static void* contains(void* container, char* name, int db_contains_tb){
 
 
 
-//assume enough space in col,
-//might need to change the API later to include the len of col for checking
-status insert(column *col, int data){
-    status res = {OK, NULL};
-    *(col->data[col->row_count]) = data;
-    col->row_count++;
-    return res;
-}
+
+
+
+
+// ---------start of not finished..------------------
 
 
 
 
 
-
-
-
-
+/*
+ * Takes linked list of comparator and a col
+ * return a result that contains all valid positions
+ */
 status col_scan(comparator *f, column *col, result **r){
     status res = {OK, NULL};
     //check if result is allocated
     if (*r == NULL) *r = (result*)malloc(sizeof(result));
     if (*r == NULL){
+
         res.code = ERROR;
         res.error_message = "Unable to allocate space for result.\n";
         return res;
@@ -793,6 +880,30 @@ status col_scan(comparator *f, column *col, result **r){
     //
     //
     //
+    // NOT RIGHT
+
+    for (int i=0; i<col->row_count;++i){
+        comparator* temp = f;
+        int qualify = 0;
+        Junction junc = NONE;
+        int c_val = *((temp->col->data)[i]); //curr value in col
+        while (temp){
+            int curr_logic = 0;
+            int diff = temp->p_val - c_val;
+            if ((diff > 0 && temp->type==GREATER_THAN) ||
+                (diff < 0 && temp->type==LESS_THAN) ||
+                (diff == 0 && temp->type==EQUAL))
+                curr_logic = 1;
+            if (junc == OR) qualify = (qualify+curr_logic)>0;
+            else if (junc == AND) qualify = (qualify+curr_logic)>1;
+            else qualify = curr_logic;
+            junc = temp->mode;
+            temp = temp->next_comparator;
+        }
+        if (qualify) temp_result[count++] = i;
+    }
+    //
+    //
     //
     //
     //
@@ -800,6 +911,13 @@ status col_scan(comparator *f, column *col, result **r){
     //initialize result
     (*r)->payload = (int*)malloc(sizeof(int)*(count));
     (*r)->num_tuples = count;
+    (*r)->type = POS;
+    //
+    //
+    //
+
+
+
     if ((*r)->payload == NULL){
         res.code = ERROR;
         res.error_message = "Unable to allocate space in result.\n";
@@ -840,6 +958,8 @@ status fetch(column* col, int* pos, int length, result** r){
 }
 
 
+
+//---------------update functions-------------------//
 
 status delete(column *col, int *pos){
 

@@ -20,6 +20,7 @@
 #define DATA_PATH "./data/" //default data path to store the data
 #define BUF_SIZE 1024 //buffer size for char array
 #define PATH_SIZE 256 //buffer size for a file name
+#define NAME_SIZE 50//buffer size for a name
 
 
 /*-----------End of Definition of Macros--------------------------*/
@@ -352,14 +353,6 @@ typedef struct file_node{
     struct file_node* next;
 }file_node;
 
-/*
- * this struct is used in open_db with reading in a file
- * this stores all the cols and associated tables from that file
- */
-typedef struct tb_col{
-    table* tb;
-    column* col;
-}tb_col;
 
 /*-----------End of Type Definition of Struct-------------------*/
 

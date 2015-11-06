@@ -1,19 +1,16 @@
+#ifndef PARSER_H__
+#define PARSER_H__
+
+#include "cs165_api.h"
+#include "dsl.h"
+#include "utils.h"
+
+// This parses the command string and then update the db_operator if it requires
+// a specific query plan to be executed.
+// This can automatically run jobs that don't require a query plan,
+// (e.g., create_db, create_tbl, create_col);
 //
-// Created by Siv Lu on 9/20/15.
-//
+// Usage: parse_command_string(input_query, commands, operator);
+status parse_command_string(char* str, dsl** commands, db_operator* op);
 
-#ifndef BLUS_CS165_2015_BASE_PARSER_H
-#define BLUS_CS165_2015_BASE_PARSER_H
-
-#include "data_structure.h"
-
-/*
- * Takes a query string and parses it into the query_org struct
- */
-void parse_query(char* query, query_org** res);
-
-/*
- * Takes a query_org struct, parse it into a db_operator
- */
-void parse_query_org(query_org* query, db_operator** op);
-#endif //BLUS_CS165_2015_BASE_PARSER_H
+#endif // PARSER_H__
