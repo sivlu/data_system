@@ -15,9 +15,9 @@
 /*-----------Start of Definition of Macros------------------- ----*/
 
 #define DEBUG 1 // flag for debug
-#define COL_SIZE 100 //number of values in a column
+#define COL_SIZE 1000 //number of values in a column
 #define DB_SIZE 10//number of tables in a db
-#define DATA_PATH "./data/" //default data path to store the data
+#define DATA_PATH "../data/" //default data path to store the data
 #define BUF_SIZE 1024 //buffer size for char array
 #define PATH_SIZE 256 //buffer size for a file name
 #define NAME_SIZE 50//buffer size for a name
@@ -126,7 +126,7 @@ typedef enum Aggr {
 } Aggr;
 
 typedef enum OperatorType {
-    CREATE,
+//    CREATE,
     DROP,
     SELECT,
     PROJECT,
@@ -273,6 +273,11 @@ typedef struct query_org{
     char* leftside; //variable name on the left side of "="
     char* rightside; //array of arguments
 }query_org;
+
+typedef struct val_pos{
+    int val;
+    int pos;
+}val_pos;
 
 /**
  * db_operator

@@ -125,8 +125,7 @@ status create_column(table *tb, const char* name, column** col);
  * returns  : the status of the operation.
  **/
 status create_index(column* col, IndexType type);
-
-
+status create_clustered_index(table* tbl, column* col);
 
 
 
@@ -136,9 +135,11 @@ status create_index(column* col, IndexType type);
  * the db and all of its tables/columns.
  *
  * db       : the database to be dropped.
+ * del_file: 1 delete file, 0 o.w.
+ * rm_node: 1 remove node from global linked list, 0 o.w.
  * returns  : the status of the operation.
  **/
-status drop_db(db* database, int del_file);
+status drop_db(db* database, int del_file, int rm_node);
 /**
  * drop_table(db, table)
  * Drops the table from the db.  You should permanently delete
@@ -149,17 +150,20 @@ status drop_db(db* database, int del_file);
  * returns  : the status of the operation.
  **/
 status drop_table(db* database, table* tb, int del_file);
-status drop_col(db* database, table* tb, column* col, int del_file);
+//status drop_col(db* database, table* tb, column* col, int del_file);
 
 
 
 /* Operations API */
+status relational_insert(table* tbl, const char* line);
 status insert(column *col, int data);
 status delete(column *col, int *pos);
 status update(column *col, int *pos, int new_val);
-status col_scan(comparator* f, column* col, result** r);
-status index_scan(comparator* f, column* col, result** r);
-status fetch(column* col, int* pos, int length, result** r);
+//status col_scan(comparator* f, column* col, result** r);
+//status index_scan(comparator* f, column* col, result** r);
+status fetch(column* col, int* pos, size_t length, result** r);
+status col_select(column* col, int low, int high, result** r, result* pre_selected);
+
 
 /* Query API */
 status query_prepare(const char* query, db_operator** op);
@@ -177,7 +181,7 @@ static void free_list(file_node* head);
  * and put them into a linked list of file_node
  * Note that it ignores files starting with '.'
  */
-static status list_files(char* path, file_node** head, int* count);
+static status list_files(const char* path, file_node** head, int* count);
 
 
 
@@ -193,7 +197,26 @@ static status remove_db_from_dbtable(db* database);
 static status add_db_to_dbtable(db* database);
 static status remove_disk_file(char* file_path);
 
+/*closing connection */
+static void free_before_closing();
 
+/*open db related*/
+static status find_all_table_cols(const char* line, column*** cols, int* count, db* database);
+static int parse_and_find_count(const char* title);
+static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE]);
+static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count);
 
+/*debug functions*/
+void print_db_table();
+void print_system(int data);
+void print_db(db* database);
+void print_tbl(table* tbl, int data);
+void print_result(result* res);
+
+/*index realted*/
+static int compare_val_pos(const void* a, const void *b);
+static int compare_int(const void* a, const void* b);
+static void free_index(column_index* index, IndexType type);
+static void create_sorted_index(int* index, int* vals, int len);
 #endif /* CS165_H */
 
