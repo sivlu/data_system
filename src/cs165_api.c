@@ -1151,12 +1151,9 @@ status create_clustered_index(table* tbl, column* col){
     //sort each col based on pos
     for (int i = 0; i<tbl->tb_size; ++i){
         column* cur_col = &(tbl->cols[i]);
-//        int* old_data = (int*)malloc(sizeof(int)*tbl->col_length);
         int* new_data = (int*)malloc(sizeof(int)*tbl->col_length);
         int* old_data = cur_col->data;
 
-//        cur_col->data = (int*)malloc(sizeof(int)*tbl->col_length);
-//        int* new_data = cur_col->data;
 
         for (int j = 0; j<rows; ++j){
             new_data[j] = old_data[pairs[j].pos];
