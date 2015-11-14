@@ -3,8 +3,8 @@
 #include <regex.h>
 #include <string.h>
 #include <ctype.h>
-
-#include "db.h"
+#include <data_structure.h>
+#include <cs165_api.h>
 
 // Trims the whitespace
 char* trim(char *str);

@@ -174,6 +174,7 @@ int setup_server() {
 // After handling the client, it will exit.
 // You will need to extend this to handle multiple concurrent clients
 // and remain running until it receives a shut-down command.
+struct db_node *db_table;
 int main(void)
 {
     int server_socket = setup_server();
