@@ -2,10 +2,9 @@
 // Created by Siv Lu on 9/20/15.
 //
 
-#include "cs165_api.h"
+#include "./include/cs165_api.h"
 
-extern struct db_node *db_table;
-
+//extern struct db_node *db_table;
 /*
  * open data folder where we store all the data
  * read all db from data files into memory
@@ -516,7 +515,10 @@ status drop_table(db* database, table* tb, int del_file){
             *curr_pos = EMPTY;
             if (curr_col->name) free(curr_col->name);
             if (curr_col->data) free(curr_col->data);
-            if (curr_col->index) free(curr_col->index);
+            if (curr_col->index) {
+                free_index(curr_col->index);
+                free(curr_col->index);
+            }
         }
     }
 
@@ -691,8 +693,7 @@ status create_column(table* tb, const char* name, column** col){
     //allocate space in column
     (*col)->name = strdup(name); //malloc and assign col name
     (*col)->data = (int*)malloc(sizeof(int)*(tb->col_length)); //malloc space for this col
-    (*col)->index = (column_index*)malloc(sizeof(column_index)*tb->col_length);//malloc for index
-    if ((*col)->data == NULL || (*col)->name == NULL || (*col)->index == NULL){
+    if ((*col)->data == NULL || (*col)->name == NULL){
         if ((*col)->data != NULL) free((*col)->data);
         if ((*col)->name != NULL) free((*col)->name);
         if ((*col)->index != NULL) free((*col)->index);
@@ -861,84 +862,28 @@ static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], 
 
 //assume all same table names are grouped together
 //e.g. it's always like [tb1, tb1, tb1, tb2, tb2, ...]
-static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count){
+static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count) {
     int i = 0;
-    while (i < count){
-        char* cur_tb = tb_names[i];
+    while (i < count) {
+        char *cur_tb = tb_names[i];
         printf("cur tb name: %s\n", cur_tb);
         int j = i;
-        while (j<count && strcmp(tb_names[j],cur_tb) == 0){
+        while (j < count && strcmp(tb_names[j], cur_tb) == 0) {
             ++j;
         }
-        int num_cols = j-i;
+        int num_cols = j - i;
         table *tb = NULL;
         create_table(database, cur_tb, num_cols, &tb);
-        for (int k = 0; k<num_cols; ++k){
-            column* cur_col = NULL;
-            create_column(tb,col_names[i+k], &cur_col);
-            cols[i+k] = cur_col;
+        for (int k = 0; k < num_cols; ++k) {
+            column *cur_col = NULL;
+            create_column(tb, col_names[i + k], &cur_col);
+            cols[i + k] = cur_col;
         }
         i = j;
     }
 
-//    int col_count[count];
-//    char tb_count[count][NAME_SIZE];
-//    int table_count = 0;
-//    //count how many columns in one table
-//    for (int i = 0; i<count; ++i){
-//        //see if the table name appeared before
-//        int found = 0;
-//        for (int j = 0; j<table_count; ++j){
-//            if (strcmp(tb_count[j],tb_names[i]) == 0){
-//                col_count[j]++;
-//                found = 1;
-//                break;
-//            }
-//        }
-//        //if not found, add it to the tb_count table
-//        if (!found) {
-//            strcpy(tb_count[table_count], tb_names[i]);
-//            col_count[table_count] = 1;
-//            table_count++;
-//        }
-//    }
-//    //for each table in tb_count, create it
-//    for (int i = 0; i<table_count; i++){
-//        table* tb = NULL;
-//        create_table(database,tb_count[i], col_count[i], &tb);
-//        //for each col in table, create the col
-//        for (int j = 0 ; j<count; ++j){
-//            if (strcmp(tb_names[j],tb_count[i])==0){
-//                create_column(tb, col_names[j], &(*cols[j]));
-//            }
-//        }
-//    }
 }
 
-//static void* contains(void* container, char* name, int db_contains_tb){
-//    //if container contains name, returns pointer to that item
-//    //else return NULL
-//    void* temp;
-//    PosFlag* pos;
-//    int len;
-//    if (db_contains_tb){
-//        //db tb relation
-//        container = (db*)container;
-//        temp = (table*)container->tables;
-//        pos = container->tables_pos;
-//        len = container->db_size;
-//    }else{
-//        //tb col relation
-//        container = (table*)container;
-//        temp = (col*)container->cols;
-//        pos = container->cols_pos;
-//        len = container->tb_size;
-//    }
-//    for (int i = 0; i<len; ++i){
-//        if (pos[i]) == FULL && strcmp((temp[i])->name, name) == 0) return temp;
-//    }
-//    return NULL;
-//}
 
 
 //not using this for now, will use new signature
@@ -947,68 +892,7 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
  * return a result that contains all valid positions
  */
 //status col_scan(comparator *f, column *col, result **r){
-//status res = {OK, ""};
-//check if result is allocated
-//    if (*r == NULL) *r = (result*)malloc(sizeof(result));
-//    if (*r == NULL){
-//        res.code = ERROR;
-//        res.error_message = "Unable to allocate space for result.\n";
-//        return res;
-//    }
-//    //scan the column
-//    int temp_result[col->row_count]; //initialize a <vec_pos>
-//    int count = 0; //actual count for the result
-//    //
-//    //
-//    //
-//    // NOT RIGHT
-//
-//    for (int i=0; i<col->row_count;++i){
-//        comparator* temp = f;
-//        int qualify = 0;
-//        Junction junc = NONE;
-//        int c_val = *((temp->col->data)[i]); //curr value in col
-//        while (temp){
-//            int curr_logic = 0;
-//            int diff = temp->p_val - c_val;
-//            if ((diff > 0 && temp->type==GREATER_THAN) ||
-//                (diff < 0 && temp->type==LESS_THAN) ||
-//                (diff == 0 && temp->type==EQUAL))
-//                curr_logic = 1;
-//            if (junc == OR) qualify = (qualify+curr_logic)>0;
-//            else if (junc == AND) qualify = (qualify+curr_logic)>1;
-//            else qualify = curr_logic;
-//            junc = temp->mode;
-//            temp = temp->next_comparator;
-//        }
-//        if (qualify) temp_result[count++] = i;
-//    }
-//    //
-//    //
-//    //
-//    //
-//    //
-//    //
-//    //initialize result
-//    (*r)->payload = (int*)malloc(sizeof(int)*(count));
-//    (*r)->num_tuples = count;
-//    (*r)->type = POS;
-//    //
-//    //
-//    //
-//
-//
-//
-//    if ((*r)->payload == NULL){
-//        res.code = ERROR;
-//        res.error_message = "Unable to allocate space in result.\n";
-//        return res;
-//    }
-//    //fetch data
-//    status fetch_status = fetch(col, temp_result, count, r);
-//    return fetch_status;
-//
-//}
+
 
 
 /*
@@ -1022,12 +906,13 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
 status col_select(column* col, int low, int high, result** r, result* pre_selected){
     status res = {OK, ""};
     //check if result is allocated
-    if (*r == NULL) *r = (result*)malloc(sizeof(result));
-    if (*r == NULL){
-        res.code = ERROR;
-        sprintf(res.error_message,"Unable to allocate space for result.\n");
-        return res;
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else{
+        (*r) = (result*)malloc(sizeof(result));
     }
+
+
     //initialize local variables
     int length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
     int temp_result[length]; //initialize a <vec_pos>
@@ -1049,29 +934,51 @@ status col_select(column* col, int low, int high, result** r, result* pre_select
     return res;
 }
 
+status index_select(column *col, int low, int high, result **r){
+    status res = {OK, ""};
+    //init result if not init
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else{
+        (*r) = (result*)malloc(sizeof(result));
+    }
+    //search in btree
+    int temp_result[col->row_count];
+    int count = 0;
+    btree_node* start_node = search_btree((btree_node*)col->index->index, low);
+    while (start_node){
+        for (int i = 0; i<start_node->num; ++i){
+            int curr = start_node->val[i];
+            int pos = *(int*)start_node->ptr[i];
+            if (curr >= high) break;
+            if (curr >= low) temp_result[count++] = pos;
+        }
+        start_node = (btree_node*)start_node->ptr[start_node->node_size];
+    }
+
+    //set up result
+    (*r)->type = POS;
+    (*r)->num_tuples = count;
+    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(int));
+}
+
 
 
 status fetch(column* col, int* pos, size_t length, result** r){
     status res = {OK, ""};
     //check if result is allocated
-    if (*r == NULL) {
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else {
         *r = (result *) malloc(sizeof(result));
-        if (*r == NULL) {
-            res.code = ERROR;
-            sprintf(res.error_message, "Unable to allocate space for result.\n");
-            return res;
-        }
     }
-    //check if result array is allocated
-    if ((*r)->payload == NULL){
-        (*r)->payload = (int*)malloc(sizeof(int)*length);
-        (*r)->num_tuples = length;
-        if ((*r)->payload == NULL){
-            res.code = ERROR;
-            sprintf(res.error_message, "Unable to allocate space in result.\n");
-            return res;
-        }
-    }
+
+    (*r)->payload = (int*)malloc(sizeof(int)*length);
+    (*r)->num_tuples = length;
+    (*r)->type = VAL;
+
+
     //fetch the data
     for (int i = 0; i<length; ++i){
         (*r)->payload[i] = col->data[pos[i]];
@@ -1082,20 +989,27 @@ status fetch(column* col, int* pos, size_t length, result** r){
 
 status create_index(column* col, IndexType type){
     //free old index if any
-    if (col->index) free_index(col->index, col->index->type);
+    if (col->index) free_index(col->index);
     col->index = (column_index*)malloc(sizeof(column_index));
     col->index->type = type;
+
     if (type == SORTED){
         col->index->index = (int*)malloc(sizeof(int)*col->row_count);
         create_sorted_index(col->index->index, col->data, col->row_count);
     }else{
-        //
-        //create btree index
-        //
+        btree_node* my_btree = NULL;
+        for (int i = 0; i<col->row_count; ++i){
+            insert_btree(&my_btree, col->data[i], i);
+        }
+        col->index->index = my_btree;
     }
-    //check result
-    for (int i = 0; i<col->row_count; ++i){
-        printf("%d ", ((int*)col->index->index)[i]);
+    //check result !!! turn off later
+    if (type == SORTED) {
+        for (int i = 0; i < col->row_count; ++i) {
+            printf("%d ", ((int *) col->index->index)[i]);
+        }
+    }else{
+        print_leaf_level((btree_node*)col->index->index);
     }
 }
 
@@ -1106,13 +1020,11 @@ static void create_sorted_index(int* index, int* vals, int len){
     qsort(index, len, sizeof(int), compare_int);
 }
 
-static void free_index(column_index* index, IndexType type){
-    if (type == SORTED){
+static void free_index(column_index* index){
+    if (index->type == SORTED){
         free(index->index);
     }else{
-        //
-        //call destroy Btree function
-        //
+        destroy_btree((btree_node*)index->index);
     }
 }
 
@@ -1224,7 +1136,7 @@ void print_system(int print_data){
 
 void print_result(result* res){
     printf("------------------------------------\n");
-    printf("Printing result..\n");
+    printf("result type: %s\n", res->type==POS? "positions":"values");
     for (int i = 0; i<res->num_tuples; i++){
         printf("%d ", res->payload[i]);
     }
@@ -1245,10 +1157,31 @@ void print_result(result* res){
 //
 
 //
-//status index_scan(comparator *f, column *col, result **r){
 //
 //}
 //
 ///* Query API */
 //status query_prepare(const char* query, db_operator** op);
 //status query_execute(db_operator* op, result** results);
+
+
+struct db_node* db_table;
+
+int main(){
+    db* mydb = NULL;
+    create_db("mydb", &mydb);
+    open_db("./test_data", &mydb);
+    column* col1 = &(mydb->tables[0].cols[0]);
+    column* col2 = &(mydb->tables[0].cols[1]);
+    create_index(col1, B_PLUS_TREE);
+    result* vec_pos = NULL, *vec_val = NULL;
+    print_tbl(&(mydb->tables[0]), 1);
+    col_select(col1, 0, 10, &vec_pos, NULL);
+    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+    print_result(vec_val);
+
+    index_select(col1, 0, 10, &vec_pos);
+    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+    print_result(vec_val);
+    return 0;
+}

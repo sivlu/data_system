@@ -164,6 +164,7 @@ status update(column *col, int *pos, int new_val);
 //status index_scan(comparator* f, column* col, result** r);
 status fetch(column* col, int* pos, size_t length, result** r);
 status col_select(column* col, int low, int high, result** r, result* pre_selected);
+status index_select(column *col, int low, int high, result **r);
 
 
 /* Query API */
@@ -217,7 +218,7 @@ void print_result(result* res);
 /*index related*/
 static int compare_val_pos(const void* a, const void *b);
 static int compare_int(const void* a, const void* b);
-static void free_index(column_index* index, IndexType type);
+static void free_index(column_index* index);
 static void create_sorted_index(int* index, int* vals, int len);
 #endif /* CS165_H */
 

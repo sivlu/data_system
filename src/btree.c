@@ -209,12 +209,10 @@ static void split_node(btree_node* left, btree_node* right, int is_leaf){
 
 
 
-
+//return node with range that target falls into
 btree_node* search_btree(btree_node* head, int target){
     if (head->is_leaf){
-        for (int i=0;i<head->num;i++){
-            if (head->val[i] == target) return head;
-        }
+        return head;
     }else{
         for (int i=0;i<head->num;i++){
             if (target<head->val[i]) {
