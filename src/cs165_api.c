@@ -366,18 +366,6 @@ static status write_col_file(const char* table_path, column* col){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 /*
  * remove db from db table that keeps track of db
  */
@@ -449,10 +437,6 @@ static status remove_disk_file(char* file_path){
     }
     return res;
 }
-
-
-
-
 
 
 /*

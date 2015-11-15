@@ -30,6 +30,7 @@ SOFTWARE.
 #define CS165_H
 
 #include "data_structure.h"
+#include "btree.h"
 
 /* OPERATOR API*/
 /**
@@ -213,7 +214,7 @@ void print_db(db* database);
 void print_tbl(table* tbl, int data);
 void print_result(result* res);
 
-/*index realted*/
+/*index related*/
 static int compare_val_pos(const void* a, const void *b);
 static int compare_int(const void* a, const void* b);
 static void free_index(column_index* index, IndexType type);
