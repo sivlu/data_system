@@ -21,6 +21,7 @@
 #define BUF_SIZE 1024 //buffer size for char array
 #define PATH_SIZE 256 //buffer size for a file name
 #define NAME_SIZE 50//buffer size for a name
+#define NUM_THREAD 5 //number of threads used
 
 
 /*-----------End of Definition of Macros--------------------------*/
@@ -358,6 +359,18 @@ typedef struct file_node{
     struct file_node* next;
 }file_node;
 
+//data structure to be passed in nested loop join thread
+typedef struct val_pos_data{
+    result* val1;
+    result* pos1;
+    result* val2;
+    result* pos2;
+    int start; //start of val1
+    int end; //end of val1 (exclusive)
+    int* res1;
+    int* res2;
+    int len_res;
+}val_pos_data;
 
 /*-----------End of Type Definition of Struct-------------------*/
 

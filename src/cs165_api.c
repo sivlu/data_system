@@ -1067,6 +1067,53 @@ static int compare_val_pos(const void* a, const void *b){
 
 }
 
+status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2) {
+    pthread_t tids[NUM_THREAD];
+
+
+}
+status nested_loop_join2(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
+    status res = {OK,""};
+    //allocate res1 and res2
+    if (*res1){
+        if ((*res1)->payload) free((*res1)->payload);
+    }else{
+        *res1 = (result*)malloc(sizeof(result));
+    }
+
+    if (*res1){
+        if ((*res1)->payload) free((*res1)->payload);
+    }else{
+        *res1 = (result*)malloc(sizeof(result));
+    }
+    //nested loop comparisons
+    int n = val1->num_tuples;
+    int m = val2->num_tuples;
+    int temp_res1[n*m], temp_res2[n*m];
+    int count=0;
+    for (int i = 0; i<n; ++i){
+        for (int j=0; j<n; ++j){
+            if (val1->payload[i] == val2->payload[j]){
+                temp_res1[count] = pos1->payload[i];
+                temp_res2[count] = pos2->payload[j];
+                count++;
+            }
+        }
+    }
+    //set up results
+    (*res1)->type = POS;
+    (*res2)->type = POS;
+    (*res1)->num_tuples = count;
+    (*res2)->num_tuples = count;
+    (*res1)->payload = (int*)malloc(sizeof(int)*count);
+    (*res2)->payload = (int*)malloc(sizeof(int)*count);
+    memcpy((*res1)->payload, temp_res1, count*sizeof(int));
+    memcpy((*res2)->payload, temp_res2, count*sizeof(int));
+}
+
+status hash_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
+
+
 
 // debugging print functions
 void print_db_table(){
@@ -1142,6 +1189,8 @@ void print_result(result* res){
     }
     printf("\n");
 }
+
+
 
 // ---------start of not finished..------------------
 
