@@ -226,6 +226,7 @@ static void create_sorted_index(int* index, int* vals, int len);
 
 /*join functions*/
 status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
+status nested_loop_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
 status hash_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
 
 #endif /* CS165_H */

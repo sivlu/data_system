@@ -1072,7 +1072,7 @@ status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, 
 
 
 }
-status nested_loop_join2(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
+status nested_loop_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
     status res = {OK,""};
     //allocate res1 and res2
     if (*res1){

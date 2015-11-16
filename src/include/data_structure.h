@@ -367,9 +367,9 @@ typedef struct val_pos_data{
     result* pos2;
     int start; //start of val1
     int end; //end of val1 (exclusive)
-    int* res1;
-    int* res2;
-    int len_res;
+    int* res1; //pre-allocated, shared
+    int* res2; //pre-allocated, shared
+    int len_res; //length, shared
 }val_pos_data;
 
 /*-----------End of Type Definition of Struct-------------------*/
