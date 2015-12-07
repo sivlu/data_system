@@ -1677,10 +1677,10 @@ void* partition_thread(void* arg){
 status add(result* val1, result* val2, result** res_val){
     int len = val1->num_tuples;
 
-    (*res_val) = (result*)malloc(sizeof(result);
+    (*res_val) = (result*)malloc(sizeof(result));
     (*res_val)->payload = (int*)malloc(sizeof(int)*len);
     (*res_val)->type = VAL;
-    (*res_val)->payload = len;
+    (*res_val)->num_tuples = len;
 
     for (int i = 0; i<len; ++i){
         (*res_val)->payload[i] = val1->payload[i]+val2->payload[i];
@@ -1691,7 +1691,7 @@ status add(result* val1, result* val2, result** res_val){
 status subtract(result* val1, result* val2, result** res_val){
     int len = val1->num_tuples;
 
-    (*res_val) = (result*)malloc(sizeof(result);
+    (*res_val) = (result*)malloc(sizeof(result));
     (*res_val)->payload = (int*)malloc(sizeof(int)*len);
     (*res_val)->type = VAL;
     (*res_val)->payload = len;
