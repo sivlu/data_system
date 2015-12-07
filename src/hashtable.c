@@ -64,9 +64,13 @@ htb_node* htb_getkey(htable* mytable, int key){
 }
 
 void htb_destroy(htable* mytable){
+    if (!mytable) return;
+
+    printf("table len: %d\n", mytable->length);
     for (int i = 0; i<mytable->length; ++i){
         if (mytable->slot[i] == 0){
             destroy_htb_node(&(mytable->content[i]));
+            free(mytable->content[i].poses);
         }
     }
     free(mytable->content);
@@ -75,9 +79,9 @@ void htb_destroy(htable* mytable){
 }
 
 static void destroy_htb_node(htb_node* node){
-    htb_node* temp = node;
+    htb_node* temp = node->next;
     while (temp) {
-        free(temp->poses);
+        if (temp->poses) free(temp->poses);
         htb_node* t = temp;
         temp = temp->next;
         free(t);
@@ -125,16 +129,17 @@ static void print_table(htable* mytable){
 //    for (int i=0; i<len; ++i){
 //        htb_insert(mytable, keys[i], vals[i]);
 //    }
-//    print_table(mytable);
-//    printf("found %d: %d\n", 1, htb_getkey(mytable, 1)!=NULL);
-//    printf("found %d: %d\n", 5, htb_getkey(mytable, 5)!=NULL);
-////    //testing poses
-//    htb_node* temp = htb_getkey(mytable, 2);
-//    for (int i=0; i<temp->curr_len; ++i){
-//        printf("%d, ", temp->poses[i]);
-//    }
-//    temp = htb_getkey(mytable, 0);
-//    for (int i=0; i<temp->curr_len; ++i){
-//        printf("%d, ", temp->poses[i]);
-//    }
+////    print_table(mytable);
+////    printf("found %d: %d\n", 1, htb_getkey(mytable, 1)!=NULL);
+////    printf("found %d: %d\n", 5, htb_getkey(mytable, 5)!=NULL);
+//////    //testing poses
+////    htb_node* temp = htb_getkey(mytable, 2);
+////    for (int i=0; i<temp->curr_len; ++i){
+////        printf("%d, ", temp->poses[i]);
+////    }
+////    temp = htb_getkey(mytable, 0);
+////    for (int i=0; i<temp->curr_len; ++i){
+////        printf("%d, ", temp->poses[i]);
+////    }
+//    htb_destroy(mytable);
 //}

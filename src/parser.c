@@ -20,7 +20,13 @@ status parse_dsl(char* str, dsl* d, db_operator* op);
  */
 status parse_command_string(char* str, dsl** commands, db_operator* op){
     log_info("Parsing: %s", str);
-    if
+    char* trim_str = trim(str);
+
+
+    // Nothing was found!
+    status s;
+    s.code = ERROR;
+    return s;
 }
 
 

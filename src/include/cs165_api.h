@@ -162,8 +162,7 @@ status drop_table(db* database, table* tb, int del_file);
 /* Operations API */
 status relational_insert(table* tbl, const char* line);
 status insert(column *col, int data);
-status delete(column *col, int *pos);
-status update(column *col, int *pos, int new_val);
+//status delete(column *col, int *pos);
 //status col_scan(comparator* f, column* col, result** r);
 //status index_scan(comparator* f, column* col, result** r);
 status fetch(column* col, int* pos, size_t length, result** r);
@@ -240,6 +239,13 @@ void* partition_thread(void* arg);
 void* hash_join_thread(void* arg);
 static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]);
 
+/*aggregate and updates*/
+status add(result* val1, result* val2, result** res_val);
+status subtract(result* val1, result* val2, result** res_val); //assume val1 - val2
+status min(result* val, int* min_val, int* min_pos); //if min_pos==NULL, dont get min pos
+status max(result* val, int* max_val, int* max_pos); //if max_pos==NULL, dont get max pos
+status avg(result* val, int* avg_val);
+status update(column *col, result* pos, int new_val);
 
 #endif /* CS165_H */
 

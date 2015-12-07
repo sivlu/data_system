@@ -1521,11 +1521,16 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
     for (int i=0; i<NUM_PARTITION; ++i){
         free_result(valid_pos1[i]);
         free_result(valid_pos2[i]);
+        free(partition_pos1s[i]);
+        free(partition_pos2s[i]);
+        free(partition_val1s[i]);
+        free(partition_val2s[i]);
     }
 }
 
 
 void* hash_join_thread(void* arg){
+
     hashjoin_arg* args = (hashjoin_arg*)arg;
     if (args->len1==0 || args->len2 == 0){
         free(args);
@@ -1538,7 +1543,7 @@ void* hash_join_thread(void* arg){
     for (int i = 0; i<args->len1; ++i){
         htb_insert(myhtable, args->val1[i], args->pos1[i]);
     }
-    //for each value in paritition 2, search in table
+    //for each value in partition 2, search in table
     for (int i=0; i<args->len2; ++i){
         htb_node* curr_node = htb_getkey(myhtable, args->val2[i]);
         //if it exists
@@ -1551,7 +1556,7 @@ void* hash_join_thread(void* arg){
 
     }
     free(arg);
-//    htb_destroy(myhtable);
+    htb_destroy(myhtable);
 }
 
 static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]) {
@@ -1573,7 +1578,7 @@ static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION]
             len[i][j] = 0;
         }
     }
-    //multiprocess
+    //multi-process
     for (int j = 0; j<NUM_THREAD; ++j){
         //for each thread, 4 write space for val and pos partitions
         int start = j*step_size;
@@ -1665,6 +1670,81 @@ void* partition_thread(void* arg){
 }
 
 
+
+
+
+/*Updates and aggregates*/
+status add(result* val1, result* val2, result** res_val){
+    int len = val1->num_tuples;
+
+    (*res_val) = (result*)malloc(sizeof(result);
+    (*res_val)->payload = (int*)malloc(sizeof(int)*len);
+    (*res_val)->type = VAL;
+    (*res_val)->payload = len;
+
+    for (int i = 0; i<len; ++i){
+        (*res_val)->payload[i] = val1->payload[i]+val2->payload[i];
+    }
+}
+
+//assume val1 - val2
+status subtract(result* val1, result* val2, result** res_val){
+    int len = val1->num_tuples;
+
+    (*res_val) = (result*)malloc(sizeof(result);
+    (*res_val)->payload = (int*)malloc(sizeof(int)*len);
+    (*res_val)->type = VAL;
+    (*res_val)->payload = len;
+
+    for (int i = 0; i<len; ++i){
+        (*res_val)->payload[i] = val1->payload[i]-val2->payload[i];
+    }
+}
+
+//if min_pos==NULL, dont get min pos
+status min(result* val, int* min_val, int* min_pos){
+    int min_idx = 0;
+    int min_so_far = val->payload[0];
+    for (int i=0; i<val->num_tuples; ++i){
+        if (val->payload[i]<min_so_far){
+            min_so_far = val->payload[i];
+            min_idx = i;
+        }
+    }
+    *min_val = min_so_far;
+    if (min_pos) *min_pos = min_idx;
+
+}
+
+//if max_pos==NULL, dont get max pos
+status max(result* val, int* max_val, int* max_pos){
+    int max_idx = 0;
+    int max_so_far = val->payload[0];
+    for (int i=0; i<val->num_tuples; ++i){
+        if (val->payload[i]>max_so_far){
+            max_so_far = val->payload[i];
+            max_idx = i;
+        }
+    }
+    *max_val = max_so_far;
+    if (max_pos) *max_pos = max_idx;
+}
+
+//NOTE: didnt do error checking
+status avg(result* val, int* avg_val){
+    int sum = 0;
+    for (int i=0; i<val->num_tuples; ++i){
+        sum += val->payload[i];
+    }
+    *(avg_val) = sum/val->num_tuples;
+}
+
+//NOTE: assume pos is sorted
+status update(column *col, result* pos, int new_val){
+    for (int i=0;i <pos->num_tuples; ++i){
+        col->data[pos->payload[i]] = new_val;
+    }
+}
 
 
 
@@ -1812,29 +1892,31 @@ void free_result(result* res){
 //
 //
 //    result *pos1=NULL, *pos2=NULL, *val1=NULL, *val2=NULL, *respos1=NULL, *respos2=NULL;
-//    col_select_local(col2, 80, 90, &pos1, NULL); //selecting grades in [95,100]
+//    col_select_local(col2, 90, 100, &pos1, NULL); //selecting grades in [95,100]
 //    col_select_local(col4, 165, 166, &pos2, NULL); //selecting course == 165
 //    fetch(col1, pos1->payload, pos1->num_tuples, &val1); //fetch student id with grades [95,100]
 //    fetch(col3, pos2->payload, pos2->num_tuples, &val2); //fetch student id with course 165
+//
+//
 ////    nested_loop_join_local(val1, pos1, val2, pos2, &respos1, &respos2);
 //    hash_join(val1, pos1, val2, pos2, &respos1, &respos2);
-//
 //    result *t1=NULL, *t2= NULL;
 //    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
 //    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
-//
 //    print_result(t1);
 //    print_result(t2);
-////
 //
-//    free_result(respos1);free_result(respos2);respos1 = NULL; respos2=NULL;
-//    nested_loop_join(val1, pos1, val2, pos2, &respos1, &respos2);
-//    free_result(t1);free_result(t2);t1 = NULL;t2 = NULL;
-//    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
-//    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
-//    print_result(t1);
-//    print_result(t2);
-////
+//
+//
+//
+////    free_result(respos1);free_result(respos2);respos1 = NULL; respos2=NULL;
+////    nested_loop_join(val1, pos1, val2, pos2, &respos1, &respos2);
+////    free_result(t1);free_result(t2);t1 = NULL;t2 = NULL;
+////    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
+////    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
+////    print_result(t1);
+////    print_result(t2);
+//
 //    free_result(pos1);
 //    free_result(pos2);
 //    free_result(val1);
@@ -1844,9 +1926,9 @@ void free_result(result* res){
 //    free_result(t1);
 //    free_result(t2);
 //    drop_db(mydb, 0, 1);
-
-
-
-
-    return 0;
-}
+//
+//
+//
+//
+//    return 0;
+//}
