@@ -10,18 +10,21 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <unistd.h>
 #include "utils.h"
 
 /*-----------Start of Definition of Macros------------------- ----*/
 
 #define DEBUG 1 // flag for debug
-#define COL_SIZE 10 //number of values in a column
+#define COL_SIZE 10 //number of values in a column, need to be fixed
 #define DB_SIZE 10//number of tables in a db
 #define DATA_PATH "../data/" //default data path to store the data
 #define BUF_SIZE 1024 //buffer size for char array
 #define PATH_SIZE 256 //buffer size for a file name
 #define NAME_SIZE 50//buffer size for a name
-#define NUM_THREAD 5 //number of threads used
+#define NUM_THREAD 2 //number of threads used, need to fix later
+#define PAGE_SIZE 100 //number of int in a "page" in L1, need to fix later
+#define NUM_PARTITION 2 //number of partitions for partition in hash join
 
 
 /*-----------End of Definition of Macros--------------------------*/
@@ -127,12 +130,15 @@ typedef enum Aggr {
 } Aggr;
 
 typedef enum OperatorType {
-//    CREATE,
+    CREATE_DB,
+    CREATE_TBL,
+    CREATE_COL,
+    CREATE_IDX,
     DROP,
     SELECT,
     PROJECT,
     HASH_JOIN,
-    INSERT,
+    RELATIONAL_INSERT,
     DELETE,
     UPDATE,
     AGGREGATE,
@@ -360,17 +366,57 @@ typedef struct file_node{
 }file_node;
 
 //data structure to be passed in nested loop join thread
-typedef struct val_pos_data{
+typedef struct join_arg{
     result* val1;
     result* pos1;
+    int start1;
+    int end1;
     result* val2;
     result* pos2;
-    int start; //start of val1
-    int end; //end of val1 (exclusive)
-    int* res1; //pre-allocated, shared
-    int* res2; //pre-allocated, shared
-    int len_res; //length, shared
-}val_pos_data;
+    int start2; //start of val1
+    int end2; //end of val1 (exclusive)
+    int* res_pos1;
+    int* res_pos2;
+    int* res_len;
+}join_arg;
+
+//data structure to be passed in shared select
+typedef struct scan_arg{
+    column* col; //column to read
+    int lower;
+    int higher;
+    int start;
+    int end;
+    result* res;
+    result* pre_select;
+}scan_arg;
+
+typedef struct partition_arg{
+    int* len; //count of length
+    int** part_val; //val to write, assume pre-allocated
+    int** part_pos; //pos to write, assume pre-allocated
+    result* val; //val to read
+    result* pos; //pos to read
+    int start; //start of read
+    int end; //end of read
+}partition_arg;
+
+typedef struct hashjoin_arg{
+    int *val1; //val1 in partition
+    int *val2; //val2 in partition
+    int *pos1; //pos1 in partition
+    int *pos2; //pos2 in partition
+    int len1;
+    int len2;
+    result* res_pos1;
+    result* res_pos2;
+}hashjoin_arg;
+
+//lower and upper limits
+typedef struct interval{
+    int lower;
+    int upper;
+}interval;
 
 /*-----------End of Type Definition of Struct-------------------*/
 

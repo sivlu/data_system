@@ -9,14 +9,13 @@
 
 
 
+typedef struct haha{
+    int a;
+    int b;
+}HAHA;
+
 int main(){
-    int* temp = (int*)malloc(sizeof(int)*100);
-    for (int i = 0; i<10; ++i){
-        temp[i] = i;
-    }
-    for (int i = 0; i<10; ++i) {
-        printf("%d\n", temp[i]);
-    }
+    HAHA* temp = (HAHA*)malloc(sizeof(HAHA)*0);
 
 
     return 0;

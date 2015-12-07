@@ -155,12 +155,29 @@ static void simple_insert_node(btree_node* parent, btree_node* new_node, int val
 
 //simple insert to a definitely not full leaf node
 static void simple_insert_leaf(btree_node* node, int value, int pos){
+    //search if this value is already there
+    for (int i = 0; i<node->num; ++i){
+        if (node->val[i] == value){
+            pos_node* temp = (pos_node*)node->ptr[i];
+            while (temp->next) temp = temp->next;
+            pos_node* new_pos = (pos_node*)malloc(sizeof(pos_node));
+            new_pos->pos = pos;
+            new_pos->next = NULL;
+            temp->next = new_pos;
+            return;
+        }
+    }
+
+    //if value not in there
     //assign value, increment count
     node->val[node->num] = value;
-    if (!node->ptr[node->num])
-        node->ptr[node->num] = (int*)malloc(sizeof(int));
-    *(int*)(node->ptr[node->num]) = pos;
-    node->num++;
+    if (!node->ptr[node->num]) {
+        node->ptr[node->num] = (pos_node *)malloc(sizeof(pos_node));
+        ((pos_node*)(node->ptr[node->num]))->pos = pos;
+        ((pos_node*)(node->ptr[node->num]))->next = NULL;
+        node->num++;
+    }
+
     //sort node if more than 1
     if (node->num > 1){
         //sort the values
@@ -175,6 +192,8 @@ static void simple_insert_leaf(btree_node* node, int value, int pos){
             node->ptr[i] = pairs[i].val;
         }
     }
+
+
 }
 
 //left is full node, right is empty node
@@ -185,11 +204,11 @@ static void split_node(btree_node* left, btree_node* right, int is_leaf){
         right->val[i-start] = left->val[i];
         if (is_leaf) {
             if (!right->ptr[i-start])
-                right->ptr[i-start] = (int*)malloc(sizeof(int));
-            *(int *) (right->ptr[i - start]) = *(int *) (left->ptr[i]);
+                right->ptr[i-start] = (pos_node*)malloc(sizeof(pos_node));
+            right->ptr[i - start] = left->ptr[i];
         }
         else
-            right->ptr[i-start] = left->ptr[i];
+            right->ptr[i - start] = left->ptr[i];
         left->num--;
         right->num++;
     }
@@ -236,7 +255,14 @@ void destroy_btree(btree_node* head){
 static void free_node(btree_node* node){
     if (node->is_leaf) {
         for (int i = 0; i < NODESIZE; ++i) {
-            if (node->ptr[i]) free(node->ptr[i]);
+            if (node->ptr[i]){
+                pos_node* temp = (pos_node*)node->ptr[i];
+                while (temp){
+                    pos_node* t = temp->next;
+                    free(temp);
+                    temp = t;
+                }
+            }
         }
     }
     free(node);
@@ -285,7 +311,13 @@ void print_leaf_level(btree_node* head){
 void print_leaf_node(btree_node* leaf){
     printf(" | ");
     for (int i = 0; i<leaf->num; ++i){
-        printf("%d ", leaf->val[i]);
+        printf("%d(", leaf->val[i]);
+        pos_node* temp = leaf->ptr[i];
+        while(temp){
+            printf("%d,",temp->pos);
+            temp = temp->next;
+        }
+        printf(") ");
     }
     printf(" | ");
 }
@@ -300,8 +332,8 @@ static int compare_key_val(const void* a, const void *b){
 
 //int main(){
 //    btree_node* head = NULL;
-//    int top = 4;
-//    int data[] = {8,9,0,1,2,3,4,5,6,7};
+//    int top = 10;
+//    int data[] = {5,5,5,1,2,3,4,5,4,4};
 //    for (int i = 0; i<top; ++i){
 //        insert_btree(&head, data[i], i);
 //    }
@@ -309,6 +341,6 @@ static int compare_key_val(const void* a, const void *b){
 //    print_leaf_level(head);
 ////    btree_node* temp = search_btree(head, 7);
 ////    print_leaf_node(temp);
-//    destroy_btree(head);
+////    destroy_btree(head);
 //    return 0;
 //}

@@ -13,46 +13,58 @@ char* trim(char *str);
 // parse_command_string has found a matching regex.
 status parse_dsl(char* str, dsl* d, db_operator* op);
 
+
+/*
+ * I rewrote this so we don't use regex
+ * This function parse a string into a db_operator
+ */
+status parse_command_string(char* str, dsl** commands, db_operator* op){
+    log_info("Parsing: %s", str);
+    if
+}
+
+
 // Finds a possible matching DSL command by using regular expressions.
 // If it finds a match, it calls parse_command to actually process the dsl.
-status parse_command_string(char* str, dsl** commands, db_operator* op)
-{
-    log_info("Parsing: %s", str);
-
-    // Trim the string of any spaces.
-    char* trim_str = trim(str);
-
-    // Create a regular expression to parse the string
-    regex_t regex;
-    int ret;
-
-    // Track the number of matches; a string must match all
-    int n_matches = 1;
-    regmatch_t m;
-
-    for (int i = 0; i < NUM_DSL_COMMANDS; ++i) {
-        dsl* d = commands[i];
-        if (regcomp(&regex, d->c, REG_EXTENDED) != 0) {
-            log_err("Could not compile regex\n");
-        }
-
-        // Bind regular expression associated with the string
-        ret = regexec(&regex, trim_str, n_matches, &m, 0);
-
-        // If we have a match, then figure out which one it is!
-        if (ret == 0) {
-            log_info("Found Command: %d\n", i);
-            // Here, we actually strip the command as appropriately
-            // based on the DSL to get the variable names.
-            return parse_dsl(trim_str, d, op);
-        }
-    }
-
-    // Nothing was found!
-    status s;
-    s.code = ERROR;
-    return s;
-}
+//status parse_command_string(char* str, dsl** commands, db_operator* op)
+//{
+//    log_info("Parsing: %s", str);
+//
+//    // Trim the string of any spaces.
+//    char* trim_str = trim(str);
+//
+//    // Create a regular expression to parse the string
+//    regex_t regex;
+//    int ret;
+//
+//    // Track the number of matches; a string must match all
+//    int n_matches = 1;
+//    regmatch_t m;
+//
+//    for (int i = 0; i < NUM_DSL_COMMANDS; ++i) {
+//        dsl* d = commands[i];
+//        if (regcomp(&regex, d->c, REG_EXTENDED) != 0) {
+//            log_err("Could not compile regex\n");
+//        }
+//
+//        // Bind regular expression associated with the string
+//        ret = regexec(&regex, trim_str, n_matches, &m, 0);
+//
+//        // If we have a match, then figure out which one it is!
+//        if (ret == 0) {
+//            log_info("Found Command: %d\n", i);
+//            // Here, we actually strip the command as appropriately
+//            // based on the DSL to get the variable names.
+//            return parse_dsl(trim_str, d, op);
+//        }
+//    }
+//
+//
+//    // Nothing was found!
+//    status s;
+//    s.code = ERROR;
+//    return s;
+//}
 
 status parse_dsl(char* str, dsl* d, db_operator* op)
 {

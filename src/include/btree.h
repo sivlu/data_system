@@ -27,6 +27,11 @@ typedef struct key_val{
     void* val;
 }key_val;
 
+typedef struct pos_node{
+    int pos;
+    struct pos_node *next;
+}pos_node;
+
 
 void insert_btree(btree_node** head, int value, int pos);
 btree_node* search_btree(btree_node* head, int target);

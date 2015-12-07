@@ -3,8 +3,9 @@
 //
 
 #include "./include/cs165_api.h"
+struct db_node *db_table;
 
-//extern struct db_node *db_table;
+
 /*
  * open data folder where we store all the data
  * read all db from data files into memory
@@ -895,73 +896,7 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
 
 
 
-/*
- * input:
- *  col: col to scan
- *  low: low limit, inclusive
- *  high: high limit, exclusive
- *  r: result, contains pos vec
- *  pre_selected: pre_selected pos vec
- */
-status col_select(column* col, int low, int high, result** r, result* pre_selected){
-    status res = {OK, ""};
-    //check if result is allocated
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else{
-        (*r) = (result*)malloc(sizeof(result));
-    }
 
-
-    //initialize local variables
-    int length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
-    int temp_result[length]; //initialize a <vec_pos>
-    int count = 0; //actual count for the result
-    //scan column
-    for (int i = 0; i<length; ++i){
-        int pos = pre_selected == NULL? i: pre_selected->payload[i];
-        int cur_val = col->data[pos];
-        if (cur_val >= low && cur_val < high) {
-            temp_result[count++] = i;
-        }
-    }
-    //set up result
-    (*r)->type = POS;
-    (*r)->num_tuples = count;
-    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
-    memcpy((*r)->payload, temp_result, count*sizeof(int));
-
-    return res;
-}
-
-status index_select(column *col, int low, int high, result **r){
-    status res = {OK, ""};
-    //init result if not init
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else{
-        (*r) = (result*)malloc(sizeof(result));
-    }
-    //search in btree
-    int temp_result[col->row_count];
-    int count = 0;
-    btree_node* start_node = search_btree((btree_node*)col->index->index, low);
-    while (start_node){
-        for (int i = 0; i<start_node->num; ++i){
-            int curr = start_node->val[i];
-            int pos = *(int*)start_node->ptr[i];
-            if (curr >= high) break;
-            if (curr >= low) temp_result[count++] = pos;
-        }
-        start_node = (btree_node*)start_node->ptr[start_node->node_size];
-    }
-
-    //set up result
-    (*r)->type = POS;
-    (*r)->num_tuples = count;
-    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
-    memcpy((*r)->payload, temp_result, count*sizeof(int));
-}
 
 
 
@@ -994,7 +929,7 @@ status create_index(column* col, IndexType type){
     col->index->type = type;
 
     if (type == SORTED){
-        col->index->index = (int*)malloc(sizeof(int)*col->row_count);
+        col->index->index = (val_pos*)malloc(sizeof(val_pos)*col->row_count);
         create_sorted_index(col->index->index, col->data, col->row_count);
     }else{
         btree_node* my_btree = NULL;
@@ -1003,21 +938,25 @@ status create_index(column* col, IndexType type){
         }
         col->index->index = my_btree;
     }
+
     //check result !!! turn off later
+    printf("Printing index\n");
     if (type == SORTED) {
         for (int i = 0; i < col->row_count; ++i) {
-            printf("%d ", ((int *) col->index->index)[i]);
+            printf("(%d,%d) ", ((val_pos*) col->index->index)[i].val,
+                   ((val_pos*) col->index->index)[i].pos);
         }
     }else{
         print_leaf_level((btree_node*)col->index->index);
     }
 }
 
-static void create_sorted_index(int* index, int* vals, int len){
+static void create_sorted_index(val_pos* index, int* vals, int len){
     for (int i = 0; i<len; ++i){
-        index[i] = vals[i];
+        index[i].val = vals[i];
+        index[i].pos = i;
     }
-    qsort(index, len, sizeof(int), compare_int);
+    qsort(index, len, sizeof(val_pos), compare_val_pos);
 }
 
 static void free_index(column_index* index){
@@ -1067,11 +1006,353 @@ static int compare_val_pos(const void* a, const void *b){
 
 }
 
-status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2) {
-    pthread_t tids[NUM_THREAD];
+/*
+ * success: return index
+ * fail: return -1
+ */
+static int binary_search(int* array, int len, int target){
+    int s = 0, t = len;
+    int m = (s+t)/2;
+    while (s < t){
+        if (array[m] < target)
+            s = m+1;
+        else if (array[m] > target)
+            t = m;
+        else
+            return m;
+        m = (s+t)/2;
+    }
+    return -1;
+}
 
+
+/*
+ * input:
+ *  col: col to scan
+ *  low: low limit, inclusive
+ *  high: high limit, exclusive
+ *  r: result, contains pos vec
+ *  pre_selected: pre_selected pos vec
+ *  NOTE: preselected is sorted, the returned positions are also sorted
+ */
+status col_select_local(column* col, int low, int high, result** r, result* pre_selected){
+    status res = {OK, ""};
+    //check if result is allocated
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else{
+        (*r) = (result*)malloc(sizeof(result));
+    }
+
+
+    //initialize local variables
+    int length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
+    int temp_result[length]; //initialize a <vec_pos>
+    int count = 0; //actual count for the result
+    //scan column
+    for (int i = 0; i<length; ++i){
+        int pos = pre_selected == NULL? i: pre_selected->payload[i];
+        int cur_val = col->data[pos];
+        if (cur_val >= low && cur_val < high) {
+            temp_result[count++] = pos;
+        }
+    }
+    //set up result
+    (*r)->type = POS;
+    (*r)->num_tuples = count;
+    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(int));
+
+    return res;
+}
+/*
+ * This func uses sorted index to select
+ */
+status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected){
+    status res = {OK, ""};
+    //init result if not init
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else{
+        (*r) = (result*)malloc(sizeof(result));
+    }
+    int *temp_result = NULL;
+    if (pre_selected) temp_result = (int*)malloc(sizeof(int)*pre_selected->num_tuples);
+    else temp_result = (int*)malloc(sizeof(int)*col->row_count);
+
+
+    val_pos* sorted_index = (val_pos*)col->index->index;
+    int length = col->row_count;
+    int s = 0, t= length;
+    int m = (s+t)/2;
+    if (sorted_index[0].val >= low){
+        m = 0;
+    }else {
+        while (s < t) {
+            if (sorted_index[m].val < low) {
+                s = m + 1;
+            } else if (sorted_index[m].val > low && m > 0 && sorted_index[m - 1].val < low) {
+                //m is the start point
+                break;
+            } else if (sorted_index[m].val > low) {
+                t = m;
+            } else {
+                //found the value
+                int temp = m;
+                while (temp > 0 && sorted_index[temp].val == low) temp--;
+                m = temp == m ? temp : temp + 1;
+                break;
+            }
+            m = (s + t) / 2;
+        }
+    }
+
+    int count=0;
+    while (sorted_index[m].val < high){
+        if (pre_selected){
+            if (binary_search(pre_selected->payload, pre_selected->num_tuples, sorted_index[m].pos) > -1){
+                temp_result[count++] = sorted_index[m++].pos;
+            }
+        }else {
+            temp_result[count++] = sorted_index[m++].pos;
+        }
+    }
+    //paste over result
+    (*r)->type = POS;
+    (*r)->num_tuples = count;
+    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(int));
+    //sort positions
+    qsort((*r)->payload, count, sizeof(int), compare_int);
+}
+
+
+//assume pre selected is sorted
+status index_select_local(column *col, int low, int high, result **r, result* pre_selected){
+    status res = {OK, ""};
+    //init result if not init
+    if (*r){
+        if ((*r)->payload) free((*r)->payload);
+    }else{
+        (*r) = (result*)malloc(sizeof(result));
+    }
+
+    //search in btree
+    int size = pre_selected==NULL? col->row_count : pre_selected->num_tuples;
+    int temp_result[size];
+    int count = 0;
+    btree_node* start_node = search_btree((btree_node*)col->index->index, low);
+    while (start_node){
+        for (int i = 0; i<start_node->num; ++i){
+            int curr = start_node->val[i];
+            pos_node* pos_head = (pos_node*)start_node->ptr[i];
+            if (curr >= high) break;
+            if (curr >= low) {
+                if (pre_selected==NULL) {
+                    while (pos_head) {
+                        //if nothing is preselect, we just append this to result
+                        temp_result[count++] = pos_head->pos;
+                        pos_head = pos_head->next;
+                    }
+                }else{
+                    while (pos_head) {
+                        if (binary_search(pre_selected->payload, pre_selected->num_tuples, pos_head->pos) > -1) {
+                            //if preselected, search whether this is in preselected
+                            temp_result[count++] = pos_head->pos;
+                        }
+                        pos_head = pos_head->next;
+                    }
+                }
+            }
+        }
+        start_node = (btree_node*)start_node->ptr[start_node->node_size];
+    }
+
+    //set up result
+    (*r)->type = POS;
+    (*r)->num_tuples = count;
+    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(int));
+    //sort positions
+    qsort((*r)->payload, count, sizeof(int), compare_int);
+}
+
+
+
+
+
+//
+//investigate
+//
+
+
+/* start of functions for shared scan, assume pre_selected is sorted
+ * note shared scan only uses column scan
+ * this func scan one column, but compares multiple things
+ * and write to multiple results
+ * NOTE: array of results have to be allocated already
+*/
+status shared_select(column *col, result* pre_selected, interval* limits, int length, result* results[]){
+    status status_res = {OK, ""};
+
+    //execute each query
+    pthread_t tids[NUM_THREAD];
+    int size = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
+    for (int start = 0; start < size; start+= PAGE_SIZE) {
+        int end = start+PAGE_SIZE > size? size:start+PAGE_SIZE;
+
+        for (int i = 0; i < length; ++i) {
+            pthread_t *curr_tid = &(tids[i%NUM_THREAD]);
+            scan_arg* arg = (scan_arg*)malloc(sizeof(scan_arg));
+            arg->col = col;
+            arg->lower = limits[i].lower;
+            arg->higher = limits[i].upper;
+            arg->start = start;
+            arg->end = end;
+            arg->res = results[i];
+            arg->pre_select = pre_selected;
+            pthread_create(curr_tid, NULL, col_select_thread, arg);
+
+            //if all threads are used
+            if (i%NUM_THREAD == NUM_THREAD-1 || i+1 == length){
+                //wait for all process to finish
+                for (int j = 0; j<NUM_THREAD; j++){
+                    pthread_join(tids[j], NULL);
+                }
+            }
+        }
+    }
+}
+
+//res should be initialized
+void* col_select_thread(void* arg){
+    scan_arg* args = (scan_arg*)arg;
+    result* res = args->res; //already initialized
+    int low = args->lower;
+    int high = args->higher;
+    int start = args->start;
+    int end = args->end;
+    column* col = args->col;
+    result* pres = args->pre_select;
+
+    pthread_t tid = pthread_self();
+    printf("thread id: %d", tid);
+    printf("args: l(%d), h(%d), s(%d), t(%d), res(%p)\n", low, high, start, end, res);
+
+    //scan column (or preselect)
+    int count = 0;
+    if (pres){
+        for (int i = start; i<end; ++i){
+            int pos = pres->payload[i];
+            int cur_val = col->data[pos];
+            if (cur_val >= low && cur_val < high){
+                res->payload[res->num_tuples++] = pos;
+            }
+        }
+    }else{
+        for (int i = start; i<end; ++i){
+            int cur_val = col->data[i];
+            if (cur_val >= low && cur_val < high){
+                res->payload[res->num_tuples++] = i;
+            }
+        }
+    }
+    free(arg);
+}
+
+
+
+
+//start of functions of joins...
+/* this func will trigger multi processes for doing nested loop join
+ * NOTE!!!!: assumes val1 >= val2 length*/
+status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2) {
+    status res = {OK,""};
+    //allocate res1 and res2
+
+    *res1 = (result *) malloc(sizeof(result));
+    *res2 = (result *) malloc(sizeof(result));
+    int max_possible = (val1->num_tuples)*(val2->num_tuples);
+//    (*res1)->payload = (int*)malloc(sizeof(int)*max_possible);
+//    (*res2)->payload = (int*)malloc(sizeof(int)*max_possible);
+    (*res1)->type = POS;
+    (*res2)->type = POS;
+    (*res1)->num_tuples = 0;
+    (*res2)->num_tuples = 0;
+
+    //initialize chunks in different threads
+    pthread_t tids[NUM_THREAD];
+    int* res_pos1s[NUM_THREAD];
+    int* res_pos2s[NUM_THREAD];
+    int res_lens[NUM_THREAD];
+
+    int len1 = val1->num_tuples;//longer
+    int len2 = val2->num_tuples;//shorter
+
+    int chunk_size = len1/NUM_THREAD;
+
+    for (int j=0; j<len2; j+=PAGE_SIZE) {
+        //start and end for the shorter column
+        int start2 = j;
+        int end2 = j+PAGE_SIZE>len2? len2:j+PAGE_SIZE;
+        for (int i = 0; i < NUM_THREAD; ++i) {
+            int start1 = i * chunk_size;
+            int end1 = i==NUM_THREAD-1? len1:start1+chunk_size;
+            res_pos1s[i] = (int *) malloc(sizeof(int) * chunk_size * (end2-start2));
+            res_pos2s[i] = (int *) malloc(sizeof(int) * chunk_size * (end2-start2));
+            join_arg *args = (join_arg *) malloc(sizeof(join_arg));
+            args->val1 = val1;
+            args->val2 = val2;
+            args->start1 = start1;
+            args->end1 = end1;
+            args->pos1 = pos1;
+            args->pos2 = pos2;
+            args->start2 = start2;
+            args->end2 = end2;
+            args->res_len = &(res_lens[i]);
+            args->res_pos1 = res_pos1s[i];
+            args->res_pos2 = res_pos2s[i];
+            pthread_create(&(tids[i]), NULL, nested_loop_join_thread, args);
+        }
+        for (int i=0;i <NUM_THREAD; ++i){
+            pthread_join(tids[i], NULL);
+        }
+    }
+    //get count of valid pairs
+    int total_len = 0;
+    for (int i=0; i<NUM_THREAD; ++i) total_len+=res_lens[i];
+    //allocate space and concat
+    (*res1)->payload = (int*)malloc(sizeof(int)*total_len);
+    (*res2)->payload = (int*)malloc(sizeof(int)*total_len);
+
+    for (int i = 0; i<NUM_THREAD; ++i){
+        for (int j=0; j<res_lens[i]; ++j){
+            (*res1)->payload[(*res1)->num_tuples++] = res_pos1s[i][j];
+            (*res2)->payload[(*res2)->num_tuples++] = res_pos2s[i][j];
+        }
+        free(res_pos1s[i]);
+        free(res_pos2s[i]);
+    }
 
 }
+
+void* nested_loop_join_thread(void* args){
+    int count = 0;
+    join_arg* arg = (join_arg*)args;
+    for (int i = arg->start1; i<arg->end1; ++i){
+        for (int j = arg->start2; j<arg->end2; ++j){
+            if (arg->val1->payload[i]==arg->val2->payload[j]){
+                arg->res_pos1[count] = arg->pos1->payload[i];
+                arg->res_pos2[count] = arg->pos2->payload[j];
+                ++count;
+            }
+        }
+    }
+    *(arg->res_len) = count;
+    free(args);
+}
+
+//local func for nested loop join
 status nested_loop_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
     status res = {OK,""};
     //allocate res1 and res2
@@ -1081,11 +1362,13 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
         *res1 = (result*)malloc(sizeof(result));
     }
 
-    if (*res1){
-        if ((*res1)->payload) free((*res1)->payload);
+    if (*res2){
+        if ((*res2)->payload) free((*res2)->payload);
     }else{
-        *res1 = (result*)malloc(sizeof(result));
+        *res2 = (result*)malloc(sizeof(result));
     }
+
+
     //nested loop comparisons
     int n = val1->num_tuples;
     int m = val2->num_tuples;
@@ -1111,7 +1394,278 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
     memcpy((*res2)->payload, temp_res2, count*sizeof(int));
 }
 
-status hash_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
+//multi-thread hash join
+status hash_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
+    status return_status = {OK, ""};
+
+    //set up partitions
+    int *partition_val1s[NUM_PARTITION];
+    int *partition_pos1s[NUM_PARTITION];
+    int *partition_val2s[NUM_PARTITION];
+    int *partition_pos2s[NUM_PARTITION];
+    int count1[NUM_PARTITION] = {0};
+    int count2[NUM_PARTITION] = {0};
+
+    //partition both columns
+    get_partitions(val1, pos1, partition_val1s, partition_pos1s, count1);
+    get_partitions(val2, pos2, partition_val2s, partition_pos2s, count2);
+
+    printf("Printing partitions for vector 1\n");
+    for (int i = 0; i<NUM_PARTITION; i++){
+        int* temp = partition_val1s[i];
+        int tlen = count1[i];
+        printf("total len: %d\n", tlen);
+        for (int j = 0; j<tlen; ++j) {
+            printf("%d ", temp[j]);
+        }
+        printf("\n");
+    }
+    printf("Printing partitions for vector 2\n");
+    for (int i = 0; i<NUM_PARTITION; i++){
+        int* temp = partition_val2s[i];
+        int tlen = count2[i];
+        printf("total len: %d\n", tlen);
+        for (int j = 0; j<tlen; ++j) {
+            printf("%d ", temp[j]);
+        }
+        printf("\n");
+    }
+    printf("---------------------\n");
+
+
+    //do hash join for each partition
+    result *valid_pos1[NUM_PARTITION]; //result for each partition (position) from vector 1
+    result *valid_pos2[NUM_PARTITION]; //result for each partition (position) from vector 2
+    pthread_t tids[NUM_THREAD];
+
+    for (int i = 0; i<NUM_PARTITION; ++i){
+        valid_pos1[i] = (result*)malloc(sizeof(result));
+        valid_pos2[i] = (result*)malloc(sizeof(result));
+        valid_pos1[i]->payload = (int*)malloc(sizeof(int)*(count1[i]*count2[i]));
+        valid_pos2[i]->payload = (int*)malloc(sizeof(int)*(count1[i]*count2[i]));
+        valid_pos1[i]->num_tuples = 0;
+        valid_pos2[i]->num_tuples = 0;
+        hashjoin_arg* args = (hashjoin_arg*)malloc(sizeof(hashjoin_arg));
+        if (count1[i] <= count2[i]) {
+//            printf("%d, %d\n", partition_val1s[i][0], partition_val2s[i][0]);
+            args->val1 = partition_val1s[i];
+            args->pos1 = partition_pos1s[i];
+            args->len1 = count1[i];
+            args->val2 = partition_val2s[i];
+            args->pos2 = partition_pos2s[i];
+            args->len2 = count2[i];
+            args->res_pos1 = valid_pos1[i];
+            args->res_pos2 = valid_pos2[i];
+        }else {
+            args->val2 = partition_val1s[i];
+            args->pos2 = partition_pos1s[i];
+            args->len2 = count1[i];
+            args->val1 = partition_val2s[i];
+            args->pos1 = partition_pos2s[i];
+            args->len1 = count2[i];
+            args->res_pos2 = valid_pos1[i];
+            args->res_pos1 = valid_pos2[i];
+        }
+
+        pthread_create(&(tids[i%NUM_THREAD]), NULL, hash_join_thread, args);
+        if (i%NUM_THREAD == (NUM_THREAD-1) || i+1 == NUM_PARTITION){
+            for (int j =0 ;j<NUM_THREAD; ++j){
+                pthread_join(tids[j], NULL);
+            }
+        }
+//        pthread_join(tids[0], NULL);
+//        break;
+
+
+    }
+
+
+
+//    for (int j=0 ;j<NUM_PARTITION; ++j) {
+//        printf("partition %d ----\n", j);
+//        for (int i = 0; i < valid_pos1[j]->num_tuples; ++i) {
+//            printf("(%d,%d)", valid_pos1[j]->payload[i], valid_pos2[j]->payload[i]);
+//        }
+//        printf("\n");
+//    }
+
+    //get count for each partition's join result
+    int final_count1 = 0;
+    int final_count2 = 0;
+    for (int i=0; i<NUM_PARTITION; ++i){
+        final_count1 += valid_pos1[i]->num_tuples;
+        final_count2 += valid_pos2[i]->num_tuples;
+    }
+    printf("final count1: %d\n", final_count1);
+    printf("final count2: %d\n", final_count2);
+
+
+
+    //initialize and concat result
+    //initialization
+    (*res1) = (result*)malloc(sizeof(result));
+    (*res2) = (result*)malloc(sizeof(result));
+    (*res1)->payload = (int*)malloc(sizeof(int)*final_count1);
+    (*res2)->payload = (int*)malloc(sizeof(int)*final_count2);
+    (*res1)->num_tuples = 0;
+    (*res2)->num_tuples = 0;
+    for (int i = 0; i<NUM_PARTITION; ++i){
+        for (int j = 0; j<valid_pos1[i]->num_tuples; ++j){
+            (*res1)->payload[(*res1)->num_tuples++] = valid_pos1[i]->payload[j];
+        }
+        for (int j=0; j<valid_pos2[i]->num_tuples; ++j){
+            (*res2)->payload[(*res2)->num_tuples++] = valid_pos2[i]->payload[j];
+        }
+    }
+    //free locally allocated space
+    for (int i=0; i<NUM_PARTITION; ++i){
+        free_result(valid_pos1[i]);
+        free_result(valid_pos2[i]);
+    }
+}
+
+
+void* hash_join_thread(void* arg){
+    hashjoin_arg* args = (hashjoin_arg*)arg;
+    if (args->len1==0 || args->len2 == 0){
+        free(args);
+        return NULL;
+    }
+
+    htable *myhtable = NULL;
+    htb_create(&myhtable, args->len1);
+    //insert each value from partition 1 to the table
+    for (int i = 0; i<args->len1; ++i){
+        htb_insert(myhtable, args->val1[i], args->pos1[i]);
+    }
+    //for each value in paritition 2, search in table
+    for (int i=0; i<args->len2; ++i){
+        htb_node* curr_node = htb_getkey(myhtable, args->val2[i]);
+        //if it exists
+        if(curr_node != NULL){
+            for (int j=0; j<curr_node->curr_len; ++j){
+                args->res_pos1->payload[args->res_pos1->num_tuples++] = curr_node->poses[j];
+                args->res_pos2->payload[args->res_pos2->num_tuples++] = args->pos2[i];
+            }
+        }
+
+    }
+    free(arg);
+//    htb_destroy(myhtable);
+}
+
+static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]) {
+    pthread_t tids[NUM_THREAD];
+
+    int length = val->num_tuples;
+    int step_size = length/NUM_THREAD;//size for each thread
+    int largest_step = step_size + (length%NUM_THREAD);
+
+    //prepare the write space
+    int *part_val_thread[NUM_THREAD][NUM_PARTITION];
+    int *part_pos_thread[NUM_THREAD][NUM_PARTITION];
+    int len[NUM_THREAD][NUM_PARTITION];
+    //initialize
+    for (int i=0; i<NUM_THREAD; ++i){
+        for (int j=0; j<NUM_PARTITION; ++j){
+            part_val_thread[i][j] = (int*)malloc(sizeof(int)*largest_step);
+            part_pos_thread[i][j] = (int*)malloc(sizeof(int)*largest_step);
+            len[i][j] = 0;
+        }
+    }
+    //multiprocess
+    for (int j = 0; j<NUM_THREAD; ++j){
+        //for each thread, 4 write space for val and pos partitions
+        int start = j*step_size;
+        int end = j==NUM_THREAD-1? start+largest_step:start+step_size;
+        partition_arg* args = (partition_arg*)malloc(sizeof(partition_arg));
+        args->len = len[j];
+        args->part_val = part_val_thread[j];
+        args->part_pos = part_pos_thread[j];
+        args->val = val;
+        args->pos = pos;
+        args->start = start;
+        args->end = end;
+
+        pthread_create(&(tids[j]), NULL, partition_thread, args);
+    }
+    for (int j =0; j<NUM_THREAD; ++j){
+        pthread_join(tids[j], NULL);
+    }
+
+//    for (int i= 0; i<NUM_PARTITION; ++i) {
+//        for (int j = 0; j < len[1][i]; ++j) {
+//            printf("%d ", part_val_thread[1][i][j]);
+//        }
+//        printf("\n");
+//    }
+
+
+
+    //get final count
+    for (int i=0; i<NUM_THREAD; ++i){
+        for (int j=0; j<NUM_PARTITION; ++j){
+            count[j] += len[i][j];
+        }
+    }
+
+    //allocate space
+    for (int i=0; i<NUM_PARTITION; i++){
+        par_val[i] = (int*)malloc(sizeof(int)*count[i]);
+        par_pos[i] = (int*)malloc(sizeof(int)*count[i]);
+    }
+
+    //merge results
+    int ks[NUM_PARTITION] = {0};
+    for (int i=0; i<NUM_THREAD; ++i) {
+        for (int j=0; j<NUM_PARTITION; ++j) {
+            for (int k=0; k<len[i][j]; k++){
+                par_val[j][ks[j]] = part_val_thread[i][j][k];
+                par_pos[j][ks[j]++] = part_pos_thread[i][j][k];
+            }
+        }
+    }
+
+//    for (int i = 0; i<NUM_PARTITION; ++i){
+//        for (int j=0; j<count[i]; ++j){
+//            printf("%d ", par_val[i][j]);
+//        }
+//        printf("\n");
+//    }
+
+    //free local allocated space
+    for (int i=0; i<NUM_THREAD; ++i){
+        for (int j=0; j<NUM_PARTITION; ++j){
+            free(part_val_thread[i][j]);
+            free(part_pos_thread[i][j]);
+        }
+    }
+}
+
+void* partition_thread(void* arg){
+    partition_arg* args = (partition_arg*)arg;
+//    printf("id %d, %p\n", pthread_self(), args->len);
+//    printf("start %d, end %d\n", args->start, args->end);
+    for (int i = args->start; i<args->end; ++i){
+        int curr_val = args->val->payload[i];
+        int curr_pos = args->pos->payload[i];
+        int curr_part = curr_val%NUM_PARTITION;
+        args->part_val[curr_part][(args->len[curr_part])] = curr_val;
+        args->part_pos[curr_part][(args->len[curr_part])++] = curr_pos;
+    }
+
+//    for (int i = 0; i<NUM_PARTITION; ++i){
+//        for (int j=0; j<args->len[i]; ++j){
+//            printf("%d ", args->part_val[i][j]);
+//        }
+//        printf("\n");
+//    }
+
+    free(arg);
+}
+
+
+
 
 
 
@@ -1190,21 +1744,23 @@ void print_result(result* res){
     printf("\n");
 }
 
-
+//free things
+void free_result(result* res){
+    if (res){
+        if (res->num_tuples) free(res->payload);
+        free(res);
+    }
+}
 
 // ---------start of not finished..------------------
 
 
 //---------------update functions-------------------//
 
-//status delete(column *col, int *pos){
-//}
-//
 //status update(column *col, int *pos, int new_val){
 //
 //}
 //
-
 //
 //
 //}
@@ -1214,23 +1770,83 @@ void print_result(result* res){
 //status query_execute(db_operator* op, result** results);
 
 
-struct db_node* db_table;
 
-int main(){
-    db* mydb = NULL;
-    create_db("mydb", &mydb);
-    open_db("./test_data", &mydb);
-    column* col1 = &(mydb->tables[0].cols[0]);
-    column* col2 = &(mydb->tables[0].cols[1]);
-    create_index(col1, B_PLUS_TREE);
-    result* vec_pos = NULL, *vec_val = NULL;
-    print_tbl(&(mydb->tables[0]), 1);
-    col_select(col1, 0, 10, &vec_pos, NULL);
-    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
-    print_result(vec_val);
+//int main(){
+//    db* mydb = NULL;
+//    create_db("mydb", &mydb);
+//
+//
+//
+////    int length = 3;
+////    result* results[3];
+////    //initialize result and payload
+////    for (int i = 0; i<length; i++){
+////        results[i] = (result*)malloc(sizeof(result));
+////        results[i]->type = POS;
+////        results[i]->payload = (int*)malloc(sizeof(int)*col1->row_count);
+////        results[i]->num_tuples = 0;
+////    }
+////    interval limits[3] = {{0,-1},{10,15},{1,5}};
+////    shared_select(col1, NULL, limits, length, results);
+////
+////    print_result(results[0]);
+////    print_result(results[1]);
+////    print_result(results[2]);
+//
+//    open_db("./test_data", &mydb);
+//    column* col1 = &(mydb->tables[0].cols[0]);
+//    column* col2 = &(mydb->tables[0].cols[1]);
+//    column* col3 = &(mydb->tables[1].cols[0]);
+//    column* col4 = &(mydb->tables[1].cols[1]);
+//
+////    create_index(col1, B_PLUS_TREE);
+////    result* vec_pos = NULL, *vec_val = NULL;
+////    print_tbl(&(mydb->tables[0]), 1);
+////    col_select(col1, 0, 10, &vec_pos, NULL);
+////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+////    print_result(vec_val);
+////
+////    index_select(col1, 0, 10, &vec_pos);
+////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+////    print_result(vec_val);
+//
+//
+//    result *pos1=NULL, *pos2=NULL, *val1=NULL, *val2=NULL, *respos1=NULL, *respos2=NULL;
+//    col_select_local(col2, 80, 90, &pos1, NULL); //selecting grades in [95,100]
+//    col_select_local(col4, 165, 166, &pos2, NULL); //selecting course == 165
+//    fetch(col1, pos1->payload, pos1->num_tuples, &val1); //fetch student id with grades [95,100]
+//    fetch(col3, pos2->payload, pos2->num_tuples, &val2); //fetch student id with course 165
+////    nested_loop_join_local(val1, pos1, val2, pos2, &respos1, &respos2);
+//    hash_join(val1, pos1, val2, pos2, &respos1, &respos2);
+//
+//    result *t1=NULL, *t2= NULL;
+//    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
+//    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
+//
+//    print_result(t1);
+//    print_result(t2);
+////
+//
+//    free_result(respos1);free_result(respos2);respos1 = NULL; respos2=NULL;
+//    nested_loop_join(val1, pos1, val2, pos2, &respos1, &respos2);
+//    free_result(t1);free_result(t2);t1 = NULL;t2 = NULL;
+//    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
+//    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
+//    print_result(t1);
+//    print_result(t2);
+////
+//    free_result(pos1);
+//    free_result(pos2);
+//    free_result(val1);
+//    free_result(val2);
+//    free_result(respos1);
+//    free_result(respos2);
+//    free_result(t1);
+//    free_result(t2);
+//    drop_db(mydb, 0, 1);
 
-    index_select(col1, 0, 10, &vec_pos);
-    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
-    print_result(vec_val);
+
+
+
     return 0;
 }

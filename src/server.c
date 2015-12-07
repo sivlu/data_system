@@ -61,8 +61,10 @@ db_operator* parse_command(message* recv_message, message* send_message) {
  * a serialization into a string message).
  **/
 char* execute_db_operator(db_operator* query) {
+
+
     free(query);
-    return "165";
+    return "";
 }
 
 /**

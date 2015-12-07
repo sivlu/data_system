@@ -14,7 +14,7 @@ set(SOURCE_FILES
     src/Makefile
     src/README.md
     src/server.c
-    src/utils.c src/include/parser.h src/cs165_api.c src/cs165_api.c.h src/include/data_structure.h)
+    src/utils.c src/include/parser.h src/cs165_api.c src/cs165_api.c.h src/include/data_structure.h src/include/hashtable.c src/include/hashtable.h)
 
 
 add_executable(blus_cs165_2015_base ${SOURCE_FILES})

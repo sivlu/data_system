@@ -31,6 +31,7 @@ SOFTWARE.
 
 #include "data_structure.h"
 #include "btree.h"
+#include "hashtable.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -166,8 +167,11 @@ status update(column *col, int *pos, int new_val);
 //status col_scan(comparator* f, column* col, result** r);
 //status index_scan(comparator* f, column* col, result** r);
 status fetch(column* col, int* pos, size_t length, result** r);
-status col_select(column* col, int low, int high, result** r, result* pre_selected);
-status index_select(column *col, int low, int high, result **r);
+status col_select_local(column* col, int low, int high, result** r, result* pre_selected);
+status index_select_local(column *col, int low, int high, result **r, result* pre_selected);
+status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected);
+status shared_select(column *col, result* pre_selected, interval* limits, int length, result* results[]);
+void* col_select_thread(void* arg);
 
 
 /* Query API */
@@ -201,6 +205,7 @@ static status write_col_file(const char* table_path, column* col);
 static status remove_db_from_dbtable(db* database);
 static status add_db_to_dbtable(db* database);
 static status remove_disk_file(char* file_path);
+void free_result(result* res);
 
 /*closing connection */
 static void free_before_closing();
@@ -222,12 +227,19 @@ void print_result(result* res);
 static int compare_val_pos(const void* a, const void *b);
 static int compare_int(const void* a, const void* b);
 static void free_index(column_index* index);
-static void create_sorted_index(int* index, int* vals, int len);
+static void create_sorted_index(val_pos* index, int* vals, int len);
+static int binary_search(int* array, int len, int target);
+
 
 /*join functions*/
 status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
-status nested_loop_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
 status hash_join(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
+status hash_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2);
+void* nested_loop_join_thread(void* args);
+void* partition_thread(void* arg);
+void* hash_join_thread(void* arg);
+static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]);
+
 
 #endif /* CS165_H */
 
