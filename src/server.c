@@ -30,8 +30,12 @@
 
 #define DEFAULT_QUERY_BUFFER_SIZE 1024
 
+//global
+struct db_node *db_table; //used in execute query
+
+
 // Here, we allow for a global of DSL COMMANDS to be shared in the program
-dsl** dsl_commands;
+//dsl** dsl_commands;
 
 /**
  * parse_command takes as input the send_message from the client and then
@@ -44,10 +48,12 @@ db_operator* parse_command(message* recv_message, message* send_message) {
     db_operator *dbo = malloc(sizeof(db_operator));
     dbo->lhs_var1=NULL;
     dbo->lhs_var2=NULL;
+    dbo->string = NULL;
     dbo->rhs_var1=NULL;
     dbo->rhs_var2=NULL;
     dbo->rhs_var3=NULL;
     dbo->rhs_var4=NULL;
+
 
 
     // Here you parse the message and fill in the proper db_operator fields for
@@ -55,7 +61,7 @@ db_operator* parse_command(message* recv_message, message* send_message) {
     cs165_log(stdout, recv_message->payload);
 
     // Here, we give you a default parser, you are welcome to replace it with anything you want
-    status parse_status = parse_command_string(recv_message->payload, dsl_commands, dbo);
+    status parse_status = parse_command_string(recv_message->payload, dbo);
     if (parse_status.code != OK) {
         // Something went wrong
     }
@@ -68,11 +74,109 @@ db_operator* parse_command(message* recv_message, message* send_message) {
  * on what the return type should be, maybe a result struct, and then have
  * a serialization into a string message).
  **/
-char* execute_db_operator(db_operator* query) {
+char* execute_db_operator(db_operator* op) {
+    //NOTE: skipped create tbl, and create col
+    char* op_name[] = {"CREATE_DB", "CREATE_TBL", "CREATE_COL", "CREATE_IDX", "SELECT",
+                   "FETCH", "LOAD", "HASH_JOIN", "RELATIONAL_INSERT", "ADD",
+                   "SUBTRACT", "UPDATE", "TUPLE", "SHUTDOWN", "GET_MIN", "GET_MAX", "GET_AVG"};
+    char ret_buffer[BUF_SIZE];
+    char* tuple_res = NULL;
+    sprintf(ret_buffer, "Executed: %s", op_name[op->type]);
+    log_info("Executing operation: %s", op_name[op->type]);
+
+    if (op->type == CREATE_DB){
+        db_table->this_db = NULL;
+        db* mydb = db_table->this_db;
+        create_db(op->string, &mydb);
+
+    }else if (op->type == CREATE_IDX){
+        if (op->idx_type == CLUSTERED){
+            create_clustered_index(op->tbl, op->col);
+        }else {
+            create_index(op->col, op->idx_type);
+        }
+
+    }else if (op->type == SELECT){
+        result** exist = create_var_in_pool(op->lhs_var1);
+        if (op->col->index){
+            if (op->col->index->type == SORTED){
+                sorted_select_local(op->col, op->low, op->high, exist, op->rhs_var1);
+            }else if (op->col->index->type == B_PLUS_TREE){
+                btree_select_local(op->col, op->low, op->high, exist, op->rhs_var1);
+            }
+        }else{
+            col_select_local(op->col, op->low, op->high, exist, op->rhs_var1);
+        }
+
+    }else if (op->type == FETCH){
+        result** res = create_var_in_pool(op->lhs_var1);
+        fetch(op->col, op->rhs_var1, res);
+
+    }else if (op->type == LOAD){
+        open_db(op->string, db_table->this_db);
+
+    }else if (op->type == HASH_JOIN){
+        //NOTE: uses multi threads
+        result** res_pos1 = create_var_in_pool(op->lhs_var1);
+        result** res_pos2 = create_var_in_pool(op->lhs_var2);
+        hash_join(op->rhs_var1, op->rhs_var2, op->rhs_var3, op->rhs_var4, res_pos1, res_pos2);
+
+    }else if (op->type == RELATIONAL_INSERT){
+        relational_insert(op->tbl, op->string);
+
+    }else if (op->type == ADD){
+        result** res = create_var_in_pool(op->lhs_var1);
+        add(op->rhs_var1, op->rhs_var2, res);
+
+    }else if (op->type == SUBTRACT){
+        result** res = create_var_in_pool(op->lhs_var1);
+        subtract(op->rhs_var1, op->rhs_var2, res);
+
+    }else if (op->type == UPDATE){
+        update(op->col, op->rhs_var1, op->value);
+
+    }else if (op->type == TUPLE){
+        char buf[strlen(op->string)+1];
+        strcpy(buf, op->string);
+        buf[strlen(op->string)] = 0;
+        result* args[NUM_VARS];
+        int count = 0;
+        char* token = strtok(buf, ",");
+        while(token){
+            args[count++] = *(get_var(token));
+            token = strtok(NULL, ",");
+        }
+        tuple(args, count, &tuple_res); //get tuple, save in tuple_res
 
 
-    free(query);
-    return "";
+    }else if (op->type == SHUTDOWN){
+        //save to "../data/"
+        prepare_close_conn(DATA_PATH);
+        free_variable_pool();
+        //do I need to exit?
+
+    }else if (op->type == GET_MIN){
+        result** min_val = create_var_in_pool(op->lhs_var1);
+        result** min_pos = NULL;
+        if (op->lhs_var2) min_pos = create_var_in_pool(op->lhs_var2);
+        min(op->rhs_var1, op->rhs_var2, min_val, min_pos);
+
+
+    }else if (op->type == GET_MAX){
+        result** max_val = create_var_in_pool(op->lhs_var1);
+        result** max_pos = NULL;
+        if (op->lhs_var2) max_pos = create_var_in_pool(op->lhs_var2);
+        max(op->rhs_var1, op->rhs_var2, max_val, max_pos);
+
+    }else if (op->type == GET_AVG){
+        result** average = create_var_in_pool(op->lhs_var1);
+        avg(op->rhs_var1, average);
+    }
+
+
+
+    free_op(op);
+    return tuple_res==NULL? strdup(ret_buffer):tuple_res;
 }
 
 /**
@@ -120,12 +224,14 @@ void handle_client(int client_socket) {
             // 3. Send status of the received message (OK, UNKNOWN_QUERY, etc)
             if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
                 log_err("Failed to send message.");
+                free(result);
                 exit(1);
             }
 
             // 4. Send response of request
             if (send(client_socket, result, send_message.length, 0) == -1) {
                 log_err("Failed to send message.");
+                free(result);
                 exit(1);
             }
         }
@@ -184,7 +290,6 @@ int setup_server() {
 // After handling the client, it will exit.
 // You will need to extend this to handle multiple concurrent clients
 // and remain running until it receives a shut-down command.
-struct db_node *db_table; //used in execute query
 
 
 int main(void)
@@ -195,7 +300,7 @@ int main(void)
     }
 
     // Populate the global dsl commands
-    dsl_commands = dsl_commands_init();
+//    dsl_commands = dsl_commands_init();
 
     log_info("Waiting for a connection %d ...\n", server_socket);
 

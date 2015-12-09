@@ -52,7 +52,7 @@ SOFTWARE.
  * flags   : the flags indicating the create/load options
  * returns : a status of the operation.
  */
-status open_db(const char* filename, db** database);
+status open_db(const char* filename, db* database);
 
 
 
@@ -165,9 +165,9 @@ status insert(column *col, int data);
 //status delete(column *col, int *pos);
 //status col_scan(comparator* f, column* col, result** r);
 //status index_scan(comparator* f, column* col, result** r);
-status fetch(column* col, int* pos, size_t length, result** r);
+status fetch(column* col, result* pos, result** r);
 status col_select_local(column* col, int low, int high, result** r, result* pre_selected);
-status index_select_local(column *col, int low, int high, result **r, result* pre_selected);
+status btree_select_local(column *col, int low, int high, result **r, result* pre_selected);
 status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected);
 status shared_select(column *col, result* pre_selected, interval* limits, int length, result* results[]);
 void* col_select_thread(void* arg);
@@ -242,10 +242,13 @@ static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION]
 /*aggregate and updates*/
 status add(result* val1, result* val2, result** res_val);
 status subtract(result* val1, result* val2, result** res_val); //assume val1 - val2
-status min(result* val, int* min_val, int* min_pos); //if min_pos==NULL, dont get min pos
-status max(result* val, int* max_val, int* max_pos); //if max_pos==NULL, dont get max pos
-status avg(result* val, int* avg_val);
 status update(column *col, result* pos, int new_val);
+status min(result* val, result* pos, result** min_val, result** min_pos); //if min_pos==NULL, dont get min pos
+status max(result* val, result* pos, result** max_val, result** max_pos); //if max_pos==NULL, dont get max pos
+status avg(result* val, result** avg_val);
+
+//get tuple
+status tuple(result* res_arr[], int num_res, char** tuple);
 
 #endif /* CS165_H */
 

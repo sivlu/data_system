@@ -739,15 +739,15 @@ status relational_insert(table* tbl, const char* line){
 
 
 //NOTE: assume file in correct format
-status open_db(const char* filename, db** database){
+status open_db(const char* filename, db* database){
 #ifdef DEBUG
     log_info("reading file: %s\n", filename);
-    log_info("using db: %s\n", (*database)->name);
+    log_info("using db: %s\n", (database)->name);
 #endif
 
     status res = {OK, ""};
 
-    if (*database == NULL){
+    if (database == NULL){
         res.code = ERROR;
         sprintf(res.error_message,"Database is null.\n");
     }else {
@@ -768,7 +768,7 @@ status open_db(const char* filename, db** database){
         }
 
         //create all tables, get all the cols and count of cols
-        res = find_all_table_cols(line, &cols, &count, *database);
+        res = find_all_table_cols(line, &cols, &count, database);
         if (res.code == ERROR) return res;
 
         //continue to read each line of data, parse and insert
@@ -900,15 +900,13 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
 
 
 
-status fetch(column* col, int* pos, size_t length, result** r){
+status fetch(column* col, result* pos_res, result** r){
     status res = {OK, ""};
-    //check if result is allocated
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else {
-        *r = (result *) malloc(sizeof(result));
-    }
+    int length = pos_res->num_tuples;
+    int* pos = pos_res->payload;
 
+
+    *r = (result *) malloc(sizeof(result));
     (*r)->payload = (int*)malloc(sizeof(int)*length);
     (*r)->num_tuples = length;
     (*r)->type = VAL;
@@ -1128,7 +1126,7 @@ status sorted_select_local(column* col, int low, int high, result **r, result* p
 
 
 //assume pre selected is sorted
-status index_select_local(column *col, int low, int high, result **r, result* pre_selected){
+status btree_select_local(column *col, int low, int high, result **r, result* pre_selected){
     status res = {OK, ""};
     //init result if not init
     if (*r){
@@ -1240,7 +1238,7 @@ void* col_select_thread(void* arg){
     printf("args: l(%d), h(%d), s(%d), t(%d), res(%p)\n", low, high, start, end, res);
 
     //scan column (or preselect)
-    int count = 0;
+//    int count = 0;
     if (pres){
         for (int i = start; i<end; ++i){
             int pos = pres->payload[i];
@@ -1272,7 +1270,7 @@ status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, 
 
     *res1 = (result *) malloc(sizeof(result));
     *res2 = (result *) malloc(sizeof(result));
-    int max_possible = (val1->num_tuples)*(val2->num_tuples);
+//    int max_possible = (val1->num_tuples)*(val2->num_tuples);
 //    (*res1)->payload = (int*)malloc(sizeof(int)*max_possible);
 //    (*res2)->payload = (int*)malloc(sizeof(int)*max_possible);
     (*res1)->type = POS;
@@ -1525,6 +1523,7 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
         free(partition_pos2s[i]);
         free(partition_val1s[i]);
         free(partition_val2s[i]);
+
     }
 }
 
@@ -1694,49 +1693,87 @@ status subtract(result* val1, result* val2, result** res_val){
     (*res_val) = (result*)malloc(sizeof(result));
     (*res_val)->payload = (int*)malloc(sizeof(int)*len);
     (*res_val)->type = VAL;
-    (*res_val)->payload = len;
+    (*res_val)->num_tuples = len;
 
     for (int i = 0; i<len; ++i){
         (*res_val)->payload[i] = val1->payload[i]-val2->payload[i];
     }
 }
 
+
 //if min_pos==NULL, dont get min pos
-status min(result* val, int* min_val, int* min_pos){
+status min(result* val, result* pos, result** min_val, result** min_pos){
+
+    *min_val = (result*)malloc(sizeof(result));
+    (*min_val)->payload = (int*)malloc(sizeof(int));
+    (*min_val)->type = VAL;
+    (*min_val)->num_tuples = 1;
+
+    if (pos){
+        (*min_pos) = (result*)malloc(sizeof(result));
+        (*min_pos)->payload = (int*)malloc(sizeof(int));
+        (*min_pos)->type = POS;
+        (*min_pos)->num_tuples = 1;
+    }
+
+
     int min_idx = 0;
     int min_so_far = val->payload[0];
     for (int i=0; i<val->num_tuples; ++i){
         if (val->payload[i]<min_so_far){
             min_so_far = val->payload[i];
-            min_idx = i;
+            min_idx = pos==NULL? i:pos->payload[i];
         }
     }
-    *min_val = min_so_far;
-    if (min_pos) *min_pos = min_idx;
+
+
+    (*min_val)->payload[0] = min_so_far;
+    if (pos) (*min_pos)->payload[0] = min_idx;
 
 }
 
 //if max_pos==NULL, dont get max pos
-status max(result* val, int* max_val, int* max_pos){
+status max(result* val, result* pos, result** max_val, result** max_pos){
+    *max_val = (result*)malloc(sizeof(result));
+    (*max_val)->payload = (int*)malloc(sizeof(int));
+    (*max_val)->type = VAL;
+    (*max_val)->num_tuples = 1;
+
+    if (pos){
+        (*max_pos) = (result*)malloc(sizeof(result));
+        (*max_pos)->payload = (int*)malloc(sizeof(int));
+        (*max_pos)->type = POS;
+        (*max_pos)->num_tuples = 1;
+    }
+
     int max_idx = 0;
     int max_so_far = val->payload[0];
     for (int i=0; i<val->num_tuples; ++i){
         if (val->payload[i]>max_so_far){
             max_so_far = val->payload[i];
-            max_idx = i;
+            max_idx = pos==NULL? i:pos->payload[i];
         }
     }
-    *max_val = max_so_far;
-    if (max_pos) *max_pos = max_idx;
+
+    //assign to result
+    (*max_val)->payload[0] = max_so_far;
+    if (pos) (*max_pos)->payload[0] = max_idx;
 }
 
 //NOTE: didnt do error checking
-status avg(result* val, int* avg_val){
+status avg(result* val, result** avg_val){
+    (*avg_val) = (result*)malloc(sizeof(result));
+    (*avg_val)->payload = (int*)malloc(sizeof(int));
+    (*avg_val)->num_tuples = 1;
+    (*avg_val)->type = VAL;
+
+    //find sum
     int sum = 0;
     for (int i=0; i<val->num_tuples; ++i){
         sum += val->payload[i];
     }
-    *(avg_val) = sum/val->num_tuples;
+
+    (*avg_val)->payload[0] = sum/val->num_tuples;
 }
 
 //NOTE: assume pos is sorted
@@ -1746,7 +1783,23 @@ status update(column *col, result* pos, int new_val){
     }
 }
 
+status tuple(result* res_arr[], int num_res, char** tuple){
+    int len = res_arr[0]->num_tuples;
+    char buffer[len*num_res*20];
+    strcpy(buffer, "");
 
+    for (int i = 0; i<num_res; ++i){
+        for (int j=0 ; j<len; ++j){
+            int cur = res_arr[i]->payload[j];
+            char temp[20];
+            sprintf(temp, "%d", cur);
+            strcat(buffer,temp);
+            if (j!=len-1) strcat(buffer,",");
+        }
+        strcat(buffer,"\n");
+    }
+    *tuple = strdup(buffer);
+}
 
 
 // debugging print functions
@@ -1764,7 +1817,7 @@ void print_db_table(){
 void print_db(db* database){
     printf("------------------------------------\n");
     printf("printing database...\n");
-    printf("db name: %s | tbl count: %zu\n", database->name, database->table_count);
+    printf("db name: %s | tbl count: %d\n", database->name, database->table_count);
     for (int i =0 ; i<database->db_size; ++i){
         if (database->tables_pos[i] == FULL){
             printf("\t at [%d]: [%s]\n", i, database->tables[i].name);
@@ -1775,7 +1828,7 @@ void print_db(db* database){
 void print_tbl(table* tbl, int print_data){
     printf("------------------------------------\n");
     printf("printing table...\n");
-    printf("tbl name: %s | max col: %zu | curr count: %zu \n", tbl->name, tbl->tb_size, tbl->col_count);
+    printf("tbl name: %s | max col: %d | curr count: %zu \n", tbl->name, tbl->tb_size, tbl->col_count);
     int rows = 0;
     printf("\t");
     for (int i = 0; i<tbl->tb_size; ++i){
@@ -1829,6 +1882,7 @@ void free_result(result* res){
     if (res){
         if (res->num_tuples) free(res->payload);
         free(res);
+        res = NULL;
     }
 }
 

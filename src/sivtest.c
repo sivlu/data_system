@@ -6,20 +6,31 @@
 
 //#endif
 
+void foo(char** haha){
+    char buffer[100];
+    strcpy(buffer, "");
 
+    int temp[2][2] = {{-1,2},{3,4}};
+    for (int i = 0; i<2; i++){
+        for (int j=0; j<2; ++j){
+            int cur = temp[i][j];
+            char temp[20];
+            sprintf(temp, "%d", cur);
+            strcat(buffer,temp);
+            if (j!=2-1)strcat(buffer,",");
+        }
+        strcat(buffer, "\n");
+    }
+//    printf("%s", buffer);
+    *haha = strdup(buffer);
 
+}
 
-typedef struct haha{
-    int a;
-    int b;
-}HAHA;
 
 int main(){
     char* temp = NULL;
-    char kk[] = "adsfasf";
-    char* token = strtok(kk, "p");
-    token=strtok(NULL,"p");
-    temp=strdup(token);
-    printf("%s\n", temp);
-    free(temp);
+    foo(&temp);
+    printf("%s", temp);
+
+
 }

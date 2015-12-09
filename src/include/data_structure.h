@@ -95,7 +95,6 @@ typedef enum OperatorType {
     LOAD,
     HASH_JOIN,
     RELATIONAL_INSERT,
-    DELETE,
     ADD,
     SUBTRACT,
     UPDATE,
@@ -114,10 +113,10 @@ typedef enum StatusCode {
     ERROR,
 } StatusCode;
 
-typedef enum OpenFlag {
-    CREATE = 1,
-    LOAD = 2,
-} OpenFlags;
+//typedef enum OpenFlag {
+//    CREATE = 1,
+//    LOAD = 2,
+//} OpenFlags;
 
 typedef enum ResultType{
     POS, //positions
@@ -183,11 +182,11 @@ typedef struct column {
  **/
 typedef struct table {
     char* name;
-    size_t col_count;
+    int col_count;
     column* cols;
     PosFlag* cols_pos;
-    size_t tb_size;
-    size_t col_length;
+    int tb_size;
+    int col_length;
 
 } table;
 
@@ -203,10 +202,10 @@ typedef struct table {
  **/
 typedef struct db {
     char* name;
-    size_t table_count;
+    int table_count;
     table* tables;
     PosFlag* tables_pos;
-    size_t db_size;
+    int db_size;
 } db;
 
 /* status declares an error code and associated message
@@ -219,7 +218,7 @@ typedef struct status {
 
 
 typedef struct result {
-    size_t num_tuples;
+    int num_tuples;
     int *payload;
     ResultType type;
 } result;
@@ -260,6 +259,9 @@ typedef struct db_operator {
     //limits (select)
     int low;
     int high;
+
+    //for update
+    int value;
 
 } db_operator;
 
