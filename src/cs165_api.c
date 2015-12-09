@@ -1850,82 +1850,100 @@ void free_result(result* res){
 //status query_execute(db_operator* op, result** results);
 
 
+//int main(){
+//    db* mydb=NULL;
+//    create_db("mydb", &mydb);
+//    open_db("./tt",&mydb);
+//    open_db("./test_data",&mydb);
+//    print_db(mydb);
+//    return 0;
+//}
 
+
+//
 //int main(){
 //    db* mydb = NULL;
 //    create_db("mydb", &mydb);
+//    table* tb = NULL;
+//    column* col1 = NULL;
+//    column* col2 = NULL;
+//    create_table(mydb, "tb", 2, &tb);
+//    create_column(tb, "col1", &col1);
+//    create_column(tb, "col2", &col2);
+//    open_db("./tt", &mydb);
+//    print_db(mydb);
 //
-//
-//
-////    int length = 3;
-////    result* results[3];
-////    //initialize result and payload
-////    for (int i = 0; i<length; i++){
-////        results[i] = (result*)malloc(sizeof(result));
-////        results[i]->type = POS;
-////        results[i]->payload = (int*)malloc(sizeof(int)*col1->row_count);
-////        results[i]->num_tuples = 0;
-////    }
-////    interval limits[3] = {{0,-1},{10,15},{1,5}};
-////    shared_select(col1, NULL, limits, length, results);
 ////
-////    print_result(results[0]);
-////    print_result(results[1]);
-////    print_result(results[2]);
-//
-//    open_db("./test_data", &mydb);
-//    column* col1 = &(mydb->tables[0].cols[0]);
-//    column* col2 = &(mydb->tables[0].cols[1]);
-//    column* col3 = &(mydb->tables[1].cols[0]);
-//    column* col4 = &(mydb->tables[1].cols[1]);
-//
-////    create_index(col1, B_PLUS_TREE);
-////    result* vec_pos = NULL, *vec_val = NULL;
-////    print_tbl(&(mydb->tables[0]), 1);
-////    col_select(col1, 0, 10, &vec_pos, NULL);
-////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
-////    print_result(vec_val);
 ////
-////    index_select(col1, 0, 10, &vec_pos);
-////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
-////    print_result(vec_val);
-//
-//
-//    result *pos1=NULL, *pos2=NULL, *val1=NULL, *val2=NULL, *respos1=NULL, *respos2=NULL;
-//    col_select_local(col2, 90, 100, &pos1, NULL); //selecting grades in [95,100]
-//    col_select_local(col4, 165, 166, &pos2, NULL); //selecting course == 165
-//    fetch(col1, pos1->payload, pos1->num_tuples, &val1); //fetch student id with grades [95,100]
-//    fetch(col3, pos2->payload, pos2->num_tuples, &val2); //fetch student id with course 165
-//
-//
-////    nested_loop_join_local(val1, pos1, val2, pos2, &respos1, &respos2);
-//    hash_join(val1, pos1, val2, pos2, &respos1, &respos2);
-//    result *t1=NULL, *t2= NULL;
-//    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
-//    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
-//    print_result(t1);
-//    print_result(t2);
-//
-//
-//
-//
-////    free_result(respos1);free_result(respos2);respos1 = NULL; respos2=NULL;
-////    nested_loop_join(val1, pos1, val2, pos2, &respos1, &respos2);
-////    free_result(t1);free_result(t2);t1 = NULL;t2 = NULL;
+//////    int length = 3;
+//////    result* results[3];
+//////    //initialize result and payload
+//////    for (int i = 0; i<length; i++){
+//////        results[i] = (result*)malloc(sizeof(result));
+//////        results[i]->type = POS;
+//////        results[i]->payload = (int*)malloc(sizeof(int)*col1->row_count);
+//////        results[i]->num_tuples = 0;
+//////    }
+//////    interval limits[3] = {{0,-1},{10,15},{1,5}};
+//////    shared_select(col1, NULL, limits, length, results);
+//////
+//////    print_result(results[0]);
+//////    print_result(results[1]);
+//////    print_result(results[2]);
+////
+////    open_db("./test_data", &mydb);
+////    column* col1 = &(mydb->tables[0].cols[0]);
+////    column* col2 = &(mydb->tables[0].cols[1]);
+////    column* col3 = &(mydb->tables[1].cols[0]);
+////    column* col4 = &(mydb->tables[1].cols[1]);
+////
+//////    create_index(col1, B_PLUS_TREE);
+//////    result* vec_pos = NULL, *vec_val = NULL;
+//////    print_tbl(&(mydb->tables[0]), 1);
+//////    col_select(col1, 0, 10, &vec_pos, NULL);
+//////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+//////    print_result(vec_val);
+//////
+//////    index_select(col1, 0, 10, &vec_pos);
+//////    fetch(col2, vec_pos->payload, vec_pos->num_tuples, &vec_val);
+//////    print_result(vec_val);
+////
+////
+////    result *pos1=NULL, *pos2=NULL, *val1=NULL, *val2=NULL, *respos1=NULL, *respos2=NULL;
+////    col_select_local(col2, 90, 100, &pos1, NULL); //selecting grades in [95,100]
+////    col_select_local(col4, 165, 166, &pos2, NULL); //selecting course == 165
+////    fetch(col1, pos1->payload, pos1->num_tuples, &val1); //fetch student id with grades [95,100]
+////    fetch(col3, pos2->payload, pos2->num_tuples, &val2); //fetch student id with course 165
+////
+////
+//////    nested_loop_join_local(val1, pos1, val2, pos2, &respos1, &respos2);
+////    hash_join(val1, pos1, val2, pos2, &respos1, &respos2);
+////    result *t1=NULL, *t2= NULL;
 ////    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
 ////    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
 ////    print_result(t1);
 ////    print_result(t2);
-//
-//    free_result(pos1);
-//    free_result(pos2);
-//    free_result(val1);
-//    free_result(val2);
-//    free_result(respos1);
-//    free_result(respos2);
-//    free_result(t1);
-//    free_result(t2);
-//    drop_db(mydb, 0, 1);
+////
+////
+////
+////
+//////    free_result(respos1);free_result(respos2);respos1 = NULL; respos2=NULL;
+//////    nested_loop_join(val1, pos1, val2, pos2, &respos1, &respos2);
+//////    free_result(t1);free_result(t2);t1 = NULL;t2 = NULL;
+//////    fetch(col1, respos1->payload, respos1->num_tuples, &t1);
+//////    fetch(col3, respos2->payload, respos2->num_tuples, &t2);
+//////    print_result(t1);
+//////    print_result(t2);
+////
+////    free_result(pos1);
+////    free_result(pos2);
+////    free_result(val1);
+////    free_result(val2);
+////    free_result(respos1);
+////    free_result(respos2);
+////    free_result(t1);
+////    free_result(t2);
+////    drop_db(mydb, 0, 1);
 //
 //
 //

@@ -5,6 +5,13 @@
 #include "dsl.h"
 #include "utils.h"
 
+#define NUM_VARS 100
+
+typedef struct variable{
+    char var_name[NAME_SIZE];
+    void* ptr;
+}variable;
+
 // This parses the command string and then update the db_operator if it requires
 // a specific query plan to be executed.
 // This can automatically run jobs that don't require a query plan,

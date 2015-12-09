@@ -15,8 +15,11 @@ typedef struct haha{
 }HAHA;
 
 int main(){
-    HAHA* temp = (HAHA*)malloc(sizeof(HAHA)*0);
-
-
-    return 0;
+    char* temp = NULL;
+    char kk[] = "adsfasf";
+    char* token = strtok(kk, "p");
+    token=strtok(NULL,"p");
+    temp=strdup(token);
+    printf("%s\n", temp);
+    free(temp);
 }

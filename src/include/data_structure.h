@@ -35,7 +35,6 @@
 /*
  * global var "var_table" is the table we keep track of DSL variables
  */
-extern struct var_node* var_table;
 /*
  * keep track what db has been created
  */
@@ -81,67 +80,30 @@ typedef enum PosFlag{
 typedef enum IndexType {
     SORTED,
     B_PLUS_TREE,
+    CLUSTERED
 } IndexType;
 
-/**
- * Defines a comparator flag between two values.
- **/
-typedef enum ComparatorType {
-    LESS_THAN = 1,
-    GREATER_THAN = 2,
-    EQUAL = 4,
-} ComparatorType;
 
-/**
- * A Junction defines the relationship between comparators.
- * In cases where we have more than one comparator, e.g. A.a <= 5 AND A.b > 3,
- * A NONE Junction defines the END of a comparator junction.
- *
- * Using the comparator struct defined below, we would represent our example using:
- *     // This represents the sub-component (A.b > 3)
- *     comparator f_b;
- *     f_b.p_val = 3; // Predicate values
- *     f_b.type = GREATER_THAN;
- *     f_b.mode = NONE;
- *     f_b.col = col_b;
- *
- *     // This represents the entire comparator
- *     comparator f;
- *     f.value = 5;
- *     f.type = LESS_THAN | EQUAL;
- *     f.mode = AND;
- *     f.col = col_b;
- *     f.next_comparator = &f_b;
- * For chains of more than two Junctions, left associative: "a | b & c | d"
- * evaluated as "(((a | b) & c) | d)".
- **/
-typedef enum Junction {
-    NONE,
-    OR,
-    AND,
-} Junction;
-
-typedef enum Aggr {
-    MIN,
-    MAX,
-    SUM,
-    AVG,
-    CNT,
-} Aggr;
 
 typedef enum OperatorType {
     CREATE_DB,
     CREATE_TBL,
     CREATE_COL,
     CREATE_IDX,
-    DROP,
     SELECT,
-    PROJECT,
+    FETCH,
+    LOAD,
     HASH_JOIN,
     RELATIONAL_INSERT,
     DELETE,
+    ADD,
+    SUBTRACT,
     UPDATE,
-    AGGREGATE,
+    TUPLE,
+    SHUTDOWN,
+    GET_MIN,
+    GET_MAX,
+    GET_AVG
 } OperatorType;
 
 /**
@@ -255,18 +217,6 @@ typedef struct status {
     char error_message[BUF_SIZE];
 } status;
 
-/**
- * comparator
- * A comparator defines one or more comparisons.
- * See the example in Junction
- **/
-typedef struct comparator {
-    int p_val;
-    column *col;
-    ComparatorType type;
-    Junction mode;
-    struct comparator *next_comparator;
-} comparator;
 
 typedef struct result {
     size_t num_tuples;
@@ -275,67 +225,41 @@ typedef struct result {
 } result;
 
 
-typedef struct query_org{
-    OperatorType type; //type of the function
-    char* leftside; //variable name on the left side of "="
-    char* rightside; //array of arguments
-}query_org;
-
 typedef struct val_pos{
     int val;
     int pos;
 }val_pos;
 
-/**
- * db_operator
- * The db_operator defines a database operation.  Generally, an operation will
- * be applied on column(s) of a table (SELECT, PROJECT, AGGREGATE) while other
- * operations may involve multiple tables (JOINS). The OperatorType defines
- * the kind of operation.
- *
- * In UNARY operators that only require a single table, only the variables
- * related to table1/column1 will be used.
- * In BINARY operators, the variables related to table2/column2 will be used.
- *
- * If you are operating on more than two tables, you should rely on separating
- * it into multiple operations (e.g., if you have to project on more than 2
- * tables, you should select in one operation, and then create separate
- * operators for each projection).
- *
- * Example query:
- * SELECT a FROM A WHERE A.a < 100;
- * db_operator op1;
- * op1.table1 = A;
- * op1.column1 = b;
- *
- * filter f;
- * f.value = 100;
- * f.type = LESS_THAN;
- * f.mode = NONE;
- *
- * op1.comparator = f;
- **/
+
 typedef struct db_operator {
     // Flag to choose operator
     OperatorType type;
 
-    // Used for every operator
-    table** tables;
-    column** columns;
+    //variables to be created or re-assigned
+    char* lhs_var1; //first variable (LHS)
+    char* lhs_var2; //second variable (LHS)
 
-    // Intermediaties used for PROJECT, DELETE, HASH_JOIN
-    int *pos1;
-    // Needed for HASH_JOIN
-    int *pos2;
+    //variables on RHS
+    result* rhs_var1;
+    result* rhs_var2;
+    result* rhs_var3;
+    result* rhs_var4;
 
-    // For insert/delete operations, we only use value1;
-    // For update operations, we update value1 -> value2;
-    int *value1;
-    int *value2;
+    //create name, load filename, relational insert string, tuple's argument
+    char* string;
 
-    // This includes several possible fields that may be used in the operation.
-    Aggr agg;
-    comparator* c;
+    //column index flag
+    IndexType idx_type;
+
+    //column used
+    column* col;
+
+    //table used (relational insert)
+    table* tbl;
+
+    //limits (select)
+    int low;
+    int high;
 
 } db_operator;
 
@@ -349,16 +273,6 @@ typedef struct db_node{
     struct db_node* next;
 }db_node;
 
-/*
- * var_node to form a linked list to keep track of
- * variables used in DSL
- */
-typedef struct var_node{
-    char* var_name;//variable name found in DSL query
-    char* var_type;//type used to cast var_object
-    void* var_object;//pt to object , type can be db, table, col, value array
-    struct var_node* next_var; //pt to next var_node
-}var_entry;
 
 typedef struct file_node{
     char* filename;

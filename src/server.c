@@ -42,6 +42,14 @@ dsl** dsl_commands;
 db_operator* parse_command(message* recv_message, message* send_message) {
     send_message->status = OK_WAIT_FOR_RESPONSE;
     db_operator *dbo = malloc(sizeof(db_operator));
+    dbo->lhs_var1=NULL;
+    dbo->lhs_var2=NULL;
+    dbo->rhs_var1=NULL;
+    dbo->rhs_var2=NULL;
+    dbo->rhs_var3=NULL;
+    dbo->rhs_var4=NULL;
+
+
     // Here you parse the message and fill in the proper db_operator fields for
     // now we just log the payload
     cs165_log(stdout, recv_message->payload);
@@ -176,7 +184,9 @@ int setup_server() {
 // After handling the client, it will exit.
 // You will need to extend this to handle multiple concurrent clients
 // and remain running until it receives a shut-down command.
-struct db_node *db_table;
+struct db_node *db_table; //used in execute query
+
+
 int main(void)
 {
     int server_socket = setup_server();

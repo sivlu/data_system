@@ -25,7 +25,7 @@ dsl** dsl_commands_init(void)
 
     // Assign the create commands
     commands[0]->c = create_db_command;
-    commands[0]->g = CREATE_DB;
+    commands[0]->g = CREATE_DATABASE;
 
     commands[1]->c = create_table_command;
     commands[1]->g = CREATE_TABLE;

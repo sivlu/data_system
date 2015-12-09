@@ -54,7 +54,7 @@ $(DEPSDIR)/stamp $(BUILDSTAMP):
 client: client.o utils.o
 	$(CC) $(CFLAGS) $(DEPCFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
-server: server.o dsl.o cs165_api.o parser.o utils.o
+server: server.o dsl.o cs165_api.o parser.o utils.o hashtable.o btree.o
 	$(CC) $(CFLAGS) $(DEPCFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 clean:

@@ -1,13 +1,25 @@
 #include "parser.h"
-
+#include <limits.h>
 #include <regex.h>
 #include <string.h>
 #include <ctype.h>
 #include <data_structure.h>
 #include <cs165_api.h>
 
+//keep global varibale pool and count of number of variables
+int VAR_COUNT = 0;
+variable var_pool[NUM_VARS];
+
+
+
 // Trims the whitespace
 char* trim(char *str);
+int str2int(char* token, int is_high);
+
+void parse_find_result(char* token, result* res);
+void parse_find_column(char* token, column* col);
+void parse_find_table(char* token, table* tbl);
+
 
 // Prototype for Helper function that executes that actual parsing after
 // parse_command_string has found a matching regex.
@@ -17,10 +29,154 @@ status parse_dsl(char* str, dsl* d, db_operator* op);
 /*
  * I rewrote this so we don't use regex
  * This function parse a string into a db_operator
+ * NOTE: op is pre-allocated
  */
 status parse_command_string(char* str, dsl** commands, db_operator* op){
     log_info("Parsing: %s", str);
     char* trim_str = trim(str);
+    char query[strlen(trim_str)+1];
+    strcpy(query, trim_str);
+
+
+    //case 0: check if comment or empty
+    if (strlen(trim_str)==0 || trim_str[0]=='-'){
+        op=NULL;
+        status s = {OK, ""};
+        return s;
+    }
+
+    //case 1: assignment (variable name involved)
+    char* e = strchr(trim_str, '=');
+    if (e){
+        //1. separate RHS and LHS
+        char *token = strtok(query, "=");
+        char lhs[strlen(token) + 1];
+        strncpy(lhs,token,strlen(token));
+        lhs[strlen(token)]=0;
+        token = strtok(NULL, "=");
+        char rhs[strlen(token)+1];
+        strncpy(rhs,token,strlen(token));
+        rhs[strlen(token)]=0;
+        printf("LHS: %s\n", lhs);
+        printf("RHS: %s\n", rhs);
+
+        //2. parse left
+        token = strtok(lhs, ",");
+        op->lhs_var1 = strdup(token);
+        token=strtok(NULL, ",");
+        if (token) op->lhs_var2 = strdup(token);
+
+
+        //3. parse right, series of comparisons happens here
+        token = strtok(rhs, "(");
+        char* param_delim = ",";
+        char* temp = strtok(NULL, "(");
+        char param[strlen(temp)];
+        strcpy(param,temp);
+        param[strlen(temp)-1]='\0';
+        printf("op: %s\n",token);
+        printf("param: %s\n",param);
+        //ready to parse param
+        if (strcmp(token, "select")==0){
+            op->type = SELECT;
+            //2 cases in select
+            token = strtok(param, param_delim);
+            parse_find_column(token, op->col); //TODO: implement this function
+            token = strtok(NULL, param_delim);
+            op->low = str2int(token, 0);
+            token = strtok(NULL, param_delim);
+            op->high = str2int(token, 1);
+            token = strtok(NULL, param_delim);
+            if (token) parse_find_result(token, op->rhs_var1); //TODO: implementation
+
+        }else if(strcmp(token, "fetch")==0){
+            op->type=FETCH;
+            //1 case in fetch
+            token = strtok(param, param_delim);
+            parse_find_column(token, op->col);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var1);
+
+
+        }else if(strcmp(token, "hashjoin")==0){
+            op->type=HASH_JOIN;
+            //1 case
+            token = strtok(param, param_delim);
+            parse_find_result(token, op->rhs_var1);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var2);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var3);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var4);
+
+
+        }else if(strcmp(token, "min")==0){
+            op->type = GET_MIN;
+            //2 cases
+            token = strtok(param, param_delim);
+            parse_find_result(token, op->rhs_var1);
+            token = strtok(NULL, param_delim);
+            if (token) parse_find_result(token, op->rhs_var2);
+
+        }else if(strcmp(token, "max")==0){
+            op->type = GET_MAX;
+            //2 cases
+            token = strtok(param, param_delim);
+            parse_find_result(token, op->rhs_var1);
+            token = strtok(NULL, param_delim);
+            if (token) parse_find_result(token, op->rhs_var2);
+
+        }else if(strcmp(token, "avg")==0){
+            op->type = GET_AVG;
+            //1 case
+            parse_find_result(param, op->rhs_var1);
+
+        }else if(strcmp(token, "add")==0){
+            op->type = ADD;
+            //1 case
+            token = strtok(param, param_delim);
+            parse_find_result(token, op->rhs_var1);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var2);
+
+        }else if(strcmp(token, "sub")==0){
+            op->type = SUBTRACT;
+            //1 case
+            token = strtok(param, param_delim);
+            parse_find_result(token, op->rhs_var1);
+            token = strtok(NULL, param_delim);
+            parse_find_result(token, op->rhs_var2);
+        }
+
+    }
+    //case 2: no assignment (no variable name)
+    else{
+        char* param_delim = ",";
+        char* func = strtok(query, "(");
+        char* temp = strtok(NULL, "(");
+        char param[strlen(temp)];
+        strcpy(param,temp);
+        param[strlen(temp)-1]='\0';
+        printf("op: %s\n",func);
+        printf("param: %s\n",param);
+
+        if (strcmp(func, "create")==0){
+            char* token = strtok(param, param_delim);
+
+        }else if(strcmp(func, "load")==0){
+
+        }else if(strcmp(func, "relational_insert")==0){
+
+        }else if(strcmp(func, "update")==0){
+
+        }else if(strcmp(func, "tuple")==0){
+
+        }else if(strcmp(func, "shutdown")==0){
+
+        }
+    }
+
 
 
     // Nothing was found!
@@ -253,4 +409,12 @@ char* trim(char *str)
     // Write new null terminator
     str[current] = 0;
     return str;
+}
+
+//convert string to int used in limits
+int str2int(char* token, int is_high){
+    if (strcmp(token,"null")==0){
+        return is_high? INT_MAX : INT_MIN;
+    }
+    return atoi(token);
 }

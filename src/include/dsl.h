@@ -26,7 +26,7 @@
 // p = select(col1, 5, 5) (point query)
 // p = select(col1, 5, 10) (range query)
 typedef enum DSLGroup {
-    CREATE_DB,
+    CREATE_DATABASE,
     CREATE_TABLE,
     CREATE_COLUMN
     // TODO(USER): Add more here...
