@@ -52,7 +52,7 @@ SOFTWARE.
  * flags   : the flags indicating the create/load options
  * returns : a status of the operation.
  */
-status open_db(const char* filename, db* database);
+status open_db(const char* filename, db** database);
 
 
 
@@ -97,7 +97,7 @@ status create_db(const char* db_name, db** database);
  *      // Something went wrong
  *  }
  **/
-status create_table(db* database, const char* name, size_t num_columns, table** tb);
+status create_table(db* database, const char* name, int num_columns, table** tb);
 
 /**
  * create_column(table, name, col)
@@ -194,7 +194,7 @@ static status list_files(const char* path, file_node** head, int* count);
 
 
 /* API related to closing a connection*/
-status prepare_close_conn(char* data_path);
+status prepare_close_conn(char* data_path, int remove_memory);
 static status write_db_file(const char* data_path, db* database);
 static status write_table_file(const char* db_path, table* tb);
 static status write_col_file(const char* table_path, column* col);

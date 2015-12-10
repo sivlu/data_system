@@ -1,6 +1,6 @@
 -- Load+create Data and shut down
 -- NOTE: I comment out some dsl because "load" automatically does it
-create(db,"db1")
+create(db,db1)
 -- create(tbl,"tbl1",db1,10)
 -- create(col,"col1",db1.tbl1,unsorted)
 -- create(col,"col2",db1.tbl1,unsorted)
@@ -12,7 +12,7 @@ create(db,"db1")
 -- create(col,"col8",db1.tbl1,unsorted)
 -- create(col,"col9",db1.tbl1,unsorted)
 -- create(col,"col10",db1.tbl1,unsorted)
-load("/home/cs165/tests/data.txt")
+load(../project_tests/data.txt)
 relational_insert(db1.tbl1,-1,-11,-111,-1111,-11111,1,11,111,1111,11111)
 relational_insert(db1.tbl1,-2,-22,-222,-2222,-11111,1,11,111,1111,11511)
 relational_insert(db1.tbl1,-3,-33,-333,-2222,-11111,1,11,111,1911,11111)

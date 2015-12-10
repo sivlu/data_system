@@ -16,7 +16,7 @@
 /*-----------Start of Definition of Macros------------------- ----*/
 
 #define DEBUG 1 // flag for debug
-#define COL_SIZE 10 //number of values in a column, need to be fixed
+#define COL_SIZE 1000000 //number of values in a column, need to be fixed
 #define DB_SIZE 10//number of tables in a db
 #define DATA_PATH "../data/" //default data path to store the data
 #define BUF_SIZE 1024 //buffer size for char array
@@ -219,7 +219,7 @@ typedef struct status {
 
 typedef struct result {
     int num_tuples;
-    int *payload;
+    long *payload;
     ResultType type;
 } result;
 

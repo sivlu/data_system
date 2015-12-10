@@ -35,6 +35,7 @@ status prepare_open_conn(char* data_path){
         strcat(file_path, temp->filename);
         strcat(file_path, "/"); //convention for dir
         res = read_db_file(file_path, temp->filename);
+        printf("got here\n");
         if (res.code == ERROR) return res;
         temp = temp->next;
     }
@@ -57,6 +58,7 @@ static status read_db_file(const char* db_path, char* db_name){
 
     //create db in memory
     create_db(db_name, &database);
+
 
     //find all tables in this db
     res = list_files(db_path, &table_list, &table_num);
@@ -192,6 +194,7 @@ static status list_files(const char* path, file_node** head, int* count){
     }else{
         res.code = ERROR;
         sprintf(res.error_message, "Cannot open directory.\n");
+        printf("%s", res.error_message);
     }
     closedir(dp);
 #ifdef DEBUG
@@ -209,7 +212,7 @@ static status list_files(const char* path, file_node** head, int* count){
  * remove all db from memory
  * free all db, table, col in memory..
  */
-status prepare_close_conn(char* data_path){
+status prepare_close_conn(char* data_path, int remove_memory){
     status res = {OK, ""};
 
     //clean the data folder first
@@ -228,15 +231,15 @@ status prepare_close_conn(char* data_path){
     }
 
 
-    //for each existing db, drop it, write that db to file
+    //for each existing db, write that db to file
     db_node* temp = db_table;
     while (temp != NULL){
         res = write_db_file(data_path, temp->this_db);
         if (res.code == ERROR) return res;
         temp = temp->next;
     }
-    //destroy all allocated space
-    free_before_closing();
+    //remove db table nodes memory
+    if (remove_memory) free_before_closing();
 
     return res;
 }
@@ -253,6 +256,7 @@ static void free_before_closing() {
         temp = temp->next;
         free(t);
     }
+    db_table = NULL;
 }
 
 
@@ -280,6 +284,7 @@ static status write_db_file(const char* data_path, db* database){
     if (r < 0){
         res.code = ERROR;
         sprintf(res.error_message,"Error creating database folder\n");
+        printf("%s", res.error_message);
         return res;
     }
 
@@ -546,6 +551,7 @@ status drop_table(db* database, table* tb, int del_file){
 
 
 status create_db(const char* db_name, db** database){
+    printf("Creating db [%s]\n", db_name);
     status res = {OK, ""};
 
     //name checking: unique db name
@@ -559,6 +565,8 @@ status create_db(const char* db_name, db** database){
         temp = temp->next;
     }
 
+    printf("ffff\n");
+
     //pointer checking: database space allocation
     if (*database == NULL) {
         *database = (db*)malloc(sizeof(db));
@@ -569,19 +577,11 @@ status create_db(const char* db_name, db** database){
         }
     }
 
-    //malloc space in db and check return value
+    //malloc space in db
     (*database)->name = strdup(db_name); //malloc and copy the name
     (*database)->tables = (table*)malloc(sizeof(table)*DB_SIZE);
     (*database)->tables_pos = (PosFlag*)malloc(sizeof(PosFlag)*DB_SIZE);
-    if ((*database)->name == NULL || (*database)->tables == NULL || (*database)->tables_pos == NULL){
-        if ((*database)->name != NULL) free((*database)->name);
-        if ((*database)->tables != NULL) free((*database)->tables);
-        if ((*database)->tables_pos != NULL) free((*database)->tables_pos);
 
-        res.code = ERROR;
-        sprintf(res.error_message, "Unable to allocate space in db [%s].\n", db_name);
-        return res;
-    }
 
     //initialize fields in db
     (*database)->table_count = 0; //right now there is no table in it
@@ -589,16 +589,18 @@ status create_db(const char* db_name, db** database){
     PosFlag* temp_pos = &((*database)->tables_pos[0]);
     for (int i = 0; i<DB_SIZE; ++i) temp_pos[i] = EMPTY;
 
+    printf("haha\n");
     //add db in db_table
-    res = add_db_to_dbtable(*database);
-    if (res.code == ERROR) return res; //keep this if-statement, may modify later
+    add_db_to_dbtable(*database);
+    printf("hahaha\n");
 
     return res;
 }
 
 
 //NOTE: assume db has enough space for tb
-status create_table(db* database, const char* name, size_t num_columns, table** tb){
+status create_table(db* database, const char* name, int num_columns, table** tb){
+    printf("Try to create table [%s] in db [%s]\n", name, database->name);
     status res = {OK, ""};
 
     //unique table name checking
@@ -724,6 +726,9 @@ status insert(column *col, int data){
 status relational_insert(table* tbl, const char* line){
     char copy[BUF_SIZE];
     strcpy(copy, line);
+    copy[strlen(line)] =0;
+    printf("relational inserting: %s\n", copy);
+
     char* delim = ",";
     char* token = strtok(copy, delim);
     int i = 0;
@@ -731,6 +736,7 @@ status relational_insert(table* tbl, const char* line){
         insert(&(tbl->cols[i++]), atoi(token));
         token = strtok(NULL, delim);
     }
+    tbl->col_length++;
 }
 
 
@@ -739,15 +745,15 @@ status relational_insert(table* tbl, const char* line){
 
 
 //NOTE: assume file in correct format
-status open_db(const char* filename, db* database){
+status open_db(const char* filename, db** database){
 #ifdef DEBUG
     log_info("reading file: %s\n", filename);
-    log_info("using db: %s\n", (database)->name);
+    log_info("using db: %s\n", (*database)->name);
 #endif
 
     status res = {OK, ""};
 
-    if (database == NULL){
+    if (*database == NULL){
         res.code = ERROR;
         sprintf(res.error_message,"Database is null.\n");
     }else {
@@ -768,7 +774,7 @@ status open_db(const char* filename, db* database){
         }
 
         //create all tables, get all the cols and count of cols
-        res = find_all_table_cols(line, &cols, &count, database);
+        res = find_all_table_cols(line, &cols, &count, *database);
         if (res.code == ERROR) return res;
 
         //continue to read each line of data, parse and insert
@@ -821,11 +827,11 @@ static status find_all_table_cols(const char* title, column*** cols, int* count,
 
 static int parse_and_find_count(const char* title){
 #ifdef DEBUG
-    printf("parsing line: %s\n", title);
+    printf("parsing line: %s", title);
 #endif
     char* copy = strdup(title);
     int count = 0;
-    char* token = strtok(copy, ",");
+    char* token = strtok(copy, ",\n");
     while (token){
         count++;
         token = strtok(NULL, ",");
@@ -873,8 +879,10 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
             ++j;
         }
         int num_cols = j - i;
+        printf("cur col number: %d\n", num_cols);
         table *tb = NULL;
         create_table(database, cur_tb, num_cols, &tb);
+        printf("finished creating table\n");
         for (int k = 0; k < num_cols; ++k) {
             column *cur_col = NULL;
             create_column(tb, col_names[i + k], &cur_col);
@@ -1036,11 +1044,8 @@ static int binary_search(int* array, int len, int target){
 status col_select_local(column* col, int low, int high, result** r, result* pre_selected){
     status res = {OK, ""};
     //check if result is allocated
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else{
-        (*r) = (result*)malloc(sizeof(result));
-    }
+    (*r) = (result*)malloc(sizeof(result));
+
 
 
     //initialize local variables
@@ -1069,11 +1074,9 @@ status col_select_local(column* col, int low, int high, result** r, result* pre_
 status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected){
     status res = {OK, ""};
     //init result if not init
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else{
-        (*r) = (result*)malloc(sizeof(result));
-    }
+    (*r) = (result*)malloc(sizeof(result));
+
+
     int *temp_result = NULL;
     if (pre_selected) temp_result = (int*)malloc(sizeof(int)*pre_selected->num_tuples);
     else temp_result = (int*)malloc(sizeof(int)*col->row_count);
@@ -1129,11 +1132,8 @@ status sorted_select_local(column* col, int low, int high, result **r, result* p
 status btree_select_local(column *col, int low, int high, result **r, result* pre_selected){
     status res = {OK, ""};
     //init result if not init
-    if (*r){
-        if ((*r)->payload) free((*r)->payload);
-    }else{
-        (*r) = (result*)malloc(sizeof(result));
-    }
+    (*r) = (result*)malloc(sizeof(result));
+
 
     //search in btree
     int size = pre_selected==NULL? col->row_count : pre_selected->num_tuples;
@@ -1354,17 +1354,9 @@ void* nested_loop_join_thread(void* args){
 status nested_loop_join_local(result* val1, result* pos1, result* val2, result* pos2, result** res1, result** res2){
     status res = {OK,""};
     //allocate res1 and res2
-    if (*res1){
-        if ((*res1)->payload) free((*res1)->payload);
-    }else{
-        *res1 = (result*)malloc(sizeof(result));
-    }
+    *res1 = (result*)malloc(sizeof(result));
+    *res2 = (result*)malloc(sizeof(result));
 
-    if (*res2){
-        if ((*res2)->payload) free((*res2)->payload);
-    }else{
-        *res2 = (result*)malloc(sizeof(result));
-    }
 
 
     //nested loop comparisons
@@ -1768,12 +1760,12 @@ status avg(result* val, result** avg_val){
     (*avg_val)->type = VAL;
 
     //find sum
-    int sum = 0;
+    float sum = 0;
     for (int i=0; i<val->num_tuples; ++i){
-        sum += val->payload[i];
+        sum += ((val->payload[i])/(float)(val->num_tuples));
     }
 
-    (*avg_val)->payload[0] = sum/val->num_tuples;
+    (*avg_val)->payload[0] = (int)sum;
 }
 
 //NOTE: assume pos is sorted
@@ -1788,13 +1780,13 @@ status tuple(result* res_arr[], int num_res, char** tuple){
     char buffer[len*num_res*20];
     strcpy(buffer, "");
 
-    for (int i = 0; i<num_res; ++i){
-        for (int j=0 ; j<len; ++j){
-            int cur = res_arr[i]->payload[j];
+    for (int i = 0; i<len; ++i){
+        for (int j=0 ; j<num_res; ++j){
+            int cur = res_arr[j]->payload[i];
             char temp[20];
             sprintf(temp, "%d", cur);
             strcat(buffer,temp);
-            if (j!=len-1) strcat(buffer,",");
+            if (j!=num_res-1) strcat(buffer,",");
         }
         strcat(buffer,"\n");
     }
@@ -1880,7 +1872,10 @@ void print_result(result* res){
 //free things
 void free_result(result* res){
     if (res){
-        if (res->num_tuples) free(res->payload);
+        if (res->num_tuples) {
+            free(res->payload);
+            res->num_tuples = NULL;
+        }
         free(res);
         res = NULL;
     }
@@ -1904,12 +1899,56 @@ void free_result(result* res){
 //status query_execute(db_operator* op, result** results);
 
 
-//int main(){
-//    db* mydb=NULL;
-//    create_db("mydb", &mydb);
-//    open_db("./tt",&mydb);
-//    open_db("./test_data",&mydb);
+//int main() {
+//    db *mydb = NULL;
+//    create_db("db1", &mydb);
+//    open_db("./data.txt", &mydb);
+//    relational_insert(&(mydb->tables[0]),"-1,-11,-111,-1111,-11111,1,11,111,1111,11111");
+//    relational_insert(&(mydb->tables[0]),"-2,-22,-222,-2222,-11111,1,11,111,1111,11511");
+//    relational_insert(&(mydb->tables[0]),"-3,-33,-333,-2222,-11111,1,11,111,1911,11111");
+//    relational_insert(&(mydb->tables[0]),"-4,-44,-444,-2222,-11111,1,11,111,1111,11511");
+//    relational_insert(&(mydb->tables[0]),"-5,-55,-555,-2222,-15111,1,11,111,1811,11111");
+//    relational_insert(&(mydb->tables[0]),"-6,-66,-666,-2222,-11111,1,16,111,1111,13411");
+//    relational_insert(&(mydb->tables[0]),"-7,-77,-777,-2222,-11111,1,11,711,1111,11111");
+//    relational_insert(&(mydb->tables[0]),"-8,-88,-888,-2222,-18101,1,11,111,8111,11211");
+//    relational_insert(&(mydb->tables[0]),"-9,-99,-999,-2222,-91141,1,11,111,1111,16711");
+//    relational_insert(&(mydb->tables[0]),"-10,-11,0,-34,-11111,1,11,111,1111,11111");
+//    result *s1=NULL, *f1=NULL, *a1=NULL;
+//    col_select_local(&(mydb->tables[0].cols[6]), 127, 1234567890, &s1, NULL);
+//    fetch(&(mydb->tables[0].cols[4]), s1, &f1);
+//    avg(f1, &a1);
+//    print_result(a1);
+//
+//}
+//    result* res=NULL, *res2 = NULL, *res3=NULL;
+//    col_select_local(&(mydb->tables[0].cols[0]), -200000000,0,&res,NULL);
+//    fetch(&(mydb->tables[0].cols[0]), res, &res2);
+//    print_result(res2);
+////
+//    prepare_close_conn(DATA_PATH, 1);
+//    prepare_open_conn(DATA_PATH);
+//    print_db(db_table->this_db);
+//    fetch(&(db_table->this_db->tables[0].cols[0]), res, &res3);
+//    print_result(res3);
+
 //    print_db(mydb);
+//    print_tbl(&(mydb->tables[0]), 0);
+//    relational_insert(&(mydb->tables[0]),"-1,-11,-111,-1111,-11111,1,11,111,1111,11111");
+//    prepare_close_conn(DATA_PATH);
+//    result* res=NULL, *res2 = NULL, *res3=NULL;
+//    col_select_local(&(mydb->tables[0].cols[0]), -200000000,0,&res,NULL);
+//    fetch(&(mydb->tables[0].cols[0]), res, &res2);
+//    fetch(&(mydb->tables[0].cols[1]), res, &res3);
+//
+//    result* res_arr[2];
+//    res_arr[0] = res2;
+//    res_arr[1] = res3;
+//
+//    char* string;
+//    tuple(res_arr, 2, &string);
+////    print_result(res);
+//    printf("%s\n", string);
+
 //    return 0;
 //}
 

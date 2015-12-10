@@ -14,10 +14,15 @@ typedef struct var_table{
 
 void init_var_table();
 void remove_var(int index);
-result** get_var(char* var_name);
-result** add_var(char* var_name);
-result** create_var_in_pool(char* var_name);
 void free_variable_pool();
+
+result** create_var_in_pool(char* var_name);
+result** add_var(char* var_name);
+result** get_result_ptr(char* var_name);
+
+//void create_var_in_pool(char* var_name, result** res);
+//void add_var(char* var_name, result*** res);
+//void get_var(char* var_name, result*** res);
 
 
 char* trim(char *str);

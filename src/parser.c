@@ -1,10 +1,10 @@
-#include "parser.h"
+#include "./include/parser.h"
 #include <limits.h>
 #include <regex.h>
 #include <string.h>
 #include <ctype.h>
-#include <data_structure.h>
-#include <cs165_api.h>
+#include "./include/data_structure.h"
+#include "./include/cs165_api.h"
 
 //keep global varibale pool and count of number of variables
 var_table variable_pool;
@@ -20,10 +20,18 @@ void free_op(db_operator* op){
 
 
 void parse_find_result(char* token, result** res){
-    *res = *(get_var(token));
+    for (int i= 0; i<NUM_VARS; ++i){
+        char* cur_name = variable_pool.var_names[i];
+        if (cur_name && strcmp(cur_name, token)==0){
+            printf("Found var [%s] in var pool\n", cur_name);
+            *res = (variable_pool.var_results[i]);
+            printf("[%s] has len [%d] is type [%s]\n", cur_name, (*res)->num_tuples, (*res)->type==POS?"pos":"val");
+        }
+    }
 }
 
 void parse_find_column(char* token, column** col){
+    printf("parsing [%s] to find col name\n",token);
     char temp[strlen(token)+1];
     strcpy(temp, token);
     temp[strlen(token)] = 0;
@@ -50,14 +58,17 @@ void parse_find_column(char* token, column** col){
 
 }
 void parse_find_table(char* token, table** tbl){
+    printf("parsing [%s] to find table name\n",token);
+
     char temp[strlen(token)+1];
     strcpy(temp, token);
     temp[strlen(token)] = 0;
     char* tk = strtok(temp, ".");
     char* tb_name = strtok(NULL, ".");
 
-
     db* cur_db = db_table->this_db; //head of list since we only use 1 in test
+//    print_db(cur_db);
+
     for (int i=0; i<cur_db->db_size; ++i){
         if (cur_db->tables_pos[i]==FULL && strcmp(cur_db->tables[i].name, tb_name)==0){
             *tbl = &(cur_db->tables[i]);
@@ -90,13 +101,18 @@ void remove_var(int i){
     variable_pool.var_results[i] = NULL;
 }
 
-result** get_var(char* var_name){
+/* retunr a ptr to a result* in var pool if var exists
+ * o.w. NULL
+ */
+result** get_result_ptr(char* var_name){
     for (int i= 0; i<NUM_VARS; ++i){
         char* cur_name = variable_pool.var_names[i];
         if (cur_name && strcmp(cur_name, var_name)==0){
+            printf("found var [%s] in var pool at [%d]\n", cur_name, i);
             return &(variable_pool.var_results[i]);
         }
     }
+    printf("Can't find var [%s] in var pool\n", var_name);
     return NULL;
 }
 
@@ -107,7 +123,8 @@ result** add_var(char* var_name){
     for (int i=0; i<NUM_VARS; ++i){
         char* cur_name = variable_pool.var_names[i];
         if (!cur_name){
-            cur_name = strdup(var_name);
+            printf("adding var [%s] to pool at idx [%d]\n", var_name, i);
+            variable_pool.var_names[i] = strdup(var_name);
             return &(variable_pool.var_results[i]);
         }
     }
@@ -118,12 +135,22 @@ result** add_var(char* var_name){
  * if var name already exist, overwrite by freeing the current result
  * else find a new spot
  */
-result** create_var_in_pool(char* var_name) {
-    result **exist = get_var(var_name);
-    if (exist && *exist) free_result(*exist);
-    else exist = add_var(var_name);
-    return exist;
+//void create_var_in_pool(char* var_name, result*** res) {
+//    get_var(var_name, res);
+//    if (res && *res) free_result(*res);
+//    else add_var(var_name, res);
+//}
+
+result** create_var_in_pool(char* var_name){
+    result** temp = get_result_ptr(var_name);
+    if (temp && *temp){
+        free_result(*temp);
+        return temp;
+    }else{
+        return add_var(var_name);
+    }
 }
+
 
 /*
  * I rewrote this so we don't use regex
@@ -133,8 +160,10 @@ result** create_var_in_pool(char* var_name) {
 status parse_command_string(char* str, db_operator* op){
     log_info("Parsing: %s", str);
     char* trim_str = trim(str);
+//    char* trim_str = str;
     char query[strlen(trim_str)+1];
     strcpy(query, trim_str);
+    query[strlen(trim_str)] = 0;
 
 
     //case 0: check if comment or empty
@@ -182,56 +211,50 @@ status parse_command_string(char* str, db_operator* op){
         param[strlen(temp)-1]='\0';
         printf("op: %s\n",token);
         printf("param: %s\n",param);
+        //parse all possible arguments
+        char* token1 = strtok(param, param_delim);
+        char* token2 = strtok(NULL, param_delim);
+        char* token3 = strtok(NULL, param_delim);
+        char* token4 = strtok(NULL, param_delim);
+
         //ready to parse param
         if (strcmp(token, "select")==0){
             op->type = SELECT;
             //2 cases in select
-            token = strtok(param, param_delim);
-            parse_find_column(token, &(op->col));
-            token = strtok(NULL, param_delim);
-            op->low = str2int(token, 0);
-            token = strtok(NULL, param_delim);
-            op->high = str2int(token, 1);
-            token = strtok(NULL, param_delim);
-            if (token) parse_find_result(token, &(op->rhs_var1));
+            parse_find_column(token1, &(op->col));
+            op->low = str2int(token2, 0);
+            op->high = str2int(token3, 1);
+            if (token4) parse_find_result(token4, &(op->rhs_var1));
 
         }else if(strcmp(token, "fetch")==0){
             op->type=FETCH;
             //1 case in fetch
-            token = strtok(param, param_delim);
-            parse_find_column(token, &(op->col));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
+            parse_find_column(token1, &(op->col));
+            printf("found column: %s\n", token1);
+            parse_find_result(token2, &(op->rhs_var1));
+            printf("found varibale: %s\n", token2);
 
 
         }else if(strcmp(token, "hashjoin")==0){
             op->type=HASH_JOIN;
             //1 case
-            token = strtok(param, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var2));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var3));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var4));
+            parse_find_result(token1, &(op->rhs_var1));
+            parse_find_result(token2, &(op->rhs_var2));
+            parse_find_result(token3, &(op->rhs_var3));
+            parse_find_result(token4, &(op->rhs_var4));
 
 
         }else if(strcmp(token, "min")==0){
             op->type = GET_MIN;
             //2 cases
-            token = strtok(param, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            if (token) parse_find_result(token, &(op->rhs_var2));
+            parse_find_result(token1, &(op->rhs_var1));
+            if (token2) parse_find_result(token2, &(op->rhs_var2));
 
         }else if(strcmp(token, "max")==0){
             op->type = GET_MAX;
             //2 cases
-            token = strtok(param, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            if (token) parse_find_result(token, &(op->rhs_var2));
+            parse_find_result(token1, &(op->rhs_var1));
+            if (token2) parse_find_result(token2, &(op->rhs_var2));
 
         }else if(strcmp(token, "avg")==0){
             op->type = GET_AVG;
@@ -241,18 +264,14 @@ status parse_command_string(char* str, db_operator* op){
         }else if(strcmp(token, "add")==0){
             op->type = ADD;
             //1 case
-            token = strtok(param, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var2));
+            parse_find_result(token1, &(op->rhs_var1));
+            parse_find_result(token2, &(op->rhs_var2));
 
         }else if(strcmp(token, "sub")==0){
             op->type = SUBTRACT;
             //1 case
-            token = strtok(param, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var2));
+            parse_find_result(token1, &(op->rhs_var1));
+            parse_find_result(token2, &(op->rhs_var2));
         }
 
     }
@@ -262,25 +281,29 @@ status parse_command_string(char* str, db_operator* op){
         char* token = strtok(query, "(");
         char* temp = strtok(NULL, "(");
         char param[strlen(temp)];
+        char param_reserved[strlen(temp)];
         strcpy(param,temp);
-        param[strlen(temp)-1]='\0';
+        strcpy(param_reserved,temp);
+        param[strlen(temp)-1]=0;
+        param_reserved[strlen(temp)-1]=0;
         printf("op: %s\n",token);
         printf("param: %s\n",param);
+        //get all possible arguments first
+        char* token1 = strtok(param, param_delim);
+        char* token2 = strtok(NULL, param_delim);
+        char* token3 = strtok(NULL, param_delim);
+
 
         if (strcmp(token, "create")==0){
-            token = strtok(param, param_delim);
-            if (strcmp(token, "db")==0){
+            if (strcmp(token1, "db")==0){
                 op->type = CREATE_DB;
-                token = strtok(NULL, param_delim);
-                op->string = strdup(token);
-            }else if (strcmp(token, "idx")==0){
+                op->string = strdup(token2);
+            }else if (strcmp(token1, "idx")==0){
                 op->type = CREATE_IDX;
-                token = strtok(NULL, param_delim);
-                parse_find_column(token, &(op->col));
-                parse_find_table(token, &(op->tbl));
-                token = strtok(NULL, param_delim);
-                if (token[0]=='b') op->idx_type=B_PLUS_TREE;
-                else if (token[0]=='s') op->idx_type=SORTED;
+                parse_find_column(token2, &(op->col));
+                parse_find_table(token2, &(op->tbl));
+                if (token3[0]=='b') op->idx_type=B_PLUS_TREE;
+                else if (token3[0]=='s') op->idx_type=SORTED;
                 else op->idx_type=CLUSTERED;
             }
 
@@ -292,20 +315,18 @@ status parse_command_string(char* str, db_operator* op){
 
         }else if(strcmp(token, "relational_insert")==0){
             op->type = RELATIONAL_INSERT;
-            token = strtok(param, param_delim);
-            parse_find_table(token, &(op->tbl));
-            token = strtok(NULL, param_delim);
-            op->string = strdup(token);
+            char* tb_name = strtok(param_reserved, param_delim);
+            char* longarg = strtok(NULL, "");
+
+            parse_find_table(tb_name, &(op->tbl));
+            op->string = strdup(longarg);
 
 
         }else if(strcmp(token, "update")==0){
             op->type = UPDATE;
-            token = strtok(param, param_delim);
-            parse_find_column(token, &(op->col));
-            token = strtok(NULL, param_delim);
-            parse_find_result(token, &(op->rhs_var1));
-            token = strtok(NULL, param_delim);
-            op->value = atoi(token);
+            parse_find_column(token1, &(op->col));
+            parse_find_result(token2, &(op->rhs_var1));
+            op->value = atoi(token3);
 
 
         }else if(strcmp(token, "tuple")==0){
@@ -314,13 +335,20 @@ status parse_command_string(char* str, db_operator* op){
 
         }
     }
-
-    status s = {OK, ""};
+    printf("finished parsing!!\n");
+    status s;
+    s.code=OK;
     return s;
 
 
 }
 
+
+//int main(){
+//    char* string = "create(db,\"mydb\")";
+//    db_operator* op = (db_operator*)malloc(sizeof(db_operator));
+//    parse_command_string(string, op);
+//}
 
 // Finds a possible matching DSL command by using regular expressions.
 // If it finds a match, it calls parse_command to actually process the dsl.
