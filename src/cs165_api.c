@@ -1051,7 +1051,7 @@ status col_select_local(column* col, long low, long high, result** r, result* pr
 
     //initialize local variables
     long length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
-    long temp_result[length]; //initialize a <vec_pos>
+    long* temp_result = (long*)malloc(sizeof(long)*length); //initialize a <vec_pos>
     long count = 0; //actual count for the result
     //scan column
     for (long i = 0; i<length; ++i){
@@ -1067,7 +1067,7 @@ status col_select_local(column* col, long low, long high, result** r, result* pr
     (*r)->num_tuples = count;
     (*r)->payload = (long*)malloc(sizeof(long)*count); //didnt check allocation error
     memcpy((*r)->payload, temp_result, count*sizeof(long));
-
+    free(temp_result);
     return res;
 }
 /*
@@ -1905,27 +1905,55 @@ void free_result(result* res){
 //status query_execute(db_operator* op, result** results);
 //
 //
-int main(){
-    db* mydb = NULL;
-    create_db("db1", &mydb);
-    open_db("../project_tests/data4.csv", &mydb);
-    open_db("../project_tests/data5.csv", &mydb);
 
-    table* tbl4 = &(mydb->tables[0]);
-    table* tbl5 = &(mydb->tables[1]);
+static void write_to_file(result* arr[], int num, char* filename){
+    FILE* fp = fopen(filename, "w");
+    for (int i=0 ;i<arr[0]->num_tuples; ++i){
+        for (int j = 0; j<num; ++j){
+            fprintf(fp, "%ld",arr[j]->payload[i]);
+            if (j!=num-1) fprintf(fp,",");
+        }
+        fprintf(fp,"\n");
+    }
+    fclose(fp);
+}
 
-    create_clustered_index(tbl4, &(tbl4->cols[6]));
-    create_clustered_index(tbl5, &(tbl5->cols[6]));
+///******TEST 26******/
+//int main() {
+//    db *mydb = NULL;
+//    create_db("db1", &mydb);
+//    open_db("../project_tests/data4.csv", &mydb);
+//    open_db("../project_tests/data5.csv", &mydb);
+//
+//    table *tbl4 = &(mydb->tables[0]);
+//    table *tbl5 = &(mydb->tables[1]);
+//
+//    create_clustered_index(tbl4, &(tbl4->cols[6]));
+//    create_clustered_index(tbl5, &(tbl5->cols[6]));
+//
+//    result *s1, *s2, *f1, *f2, *r1, *r2;
+//    col_select_local(&(tbl4->cols[0]), 20000, 40000, &s1, NULL);
+//    col_select_local(&(tbl5->cols[0]), 30000, 70000, &s2, NULL);
+//    fetch(&(tbl4->cols[0]), s1, &f1);
+//    fetch(&(tbl5->cols[0]), s2, &f2);
+////    printf("%ld, %ld\n", f1->num_tuples, f2->num_tuples);
+//
+//    hash_join(f1, s1, f2, s2, &r1, &r2);
+//    result* res1, *res2;
+//    fetch(&(tbl4->cols[0]), r1, &res1);
+//    fetch(&(tbl5->cols[0]), r2, &res2);
+//    result* res[2];
+//    res[0] = res1;
+//    res[1] = res2;
+////    write_to_file(res, 2, "/Users/sivlu/Desktop/temp_res.txt");
+//    char* tt;
+//    tuple(res, 2, &tt);
+//    printf("%s\n", tt);
+//}
 
-    result *s1, *s2, *f1, *f2, *r1, *r2;
-    col_select_local(&(tbl4->cols[0]), 20000, 40000, &s1, NULL);
-    col_select_local(&(tbl5->cols[0]), 30000, 70000, &s2, NULL);
-    fetch(&(tbl4->cols[0]), s1, &f1);
-    fetch(&(tbl5->cols[0]), s2, &f2);
-    printf("%ld, %ld\n", f1->num_tuples, f2->num_tuples);
 
-//    hash_join(s1,f1,s2,f2,&r1,&r2);
-
+//    nested_loop_join_local()
+//
 
 //    result *f3, *f4;
 //    fetch(&(tbl4->cols[0]), r1, &f3);
@@ -1939,7 +1967,7 @@ int main(){
 //    printf("%s\n", haha);
 
 
-}
+//}
 
 //int main() {
 //    db *mydb = NULL;

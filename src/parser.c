@@ -340,7 +340,7 @@ status parse_command_string(char* str, db_operator* op){
 
         }else if(strcmp(token, "tuple")==0){
             op->type = TUPLE;
-            op->string = strdup(param);
+            op->string = strdup(param_reserved);
 
         }
     }

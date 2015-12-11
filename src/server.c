@@ -119,8 +119,6 @@ char* execute_db_operator(db_operator* op) {
         }else{
             col_select_local(op->col, op->low, op->high, exist, op->rhs_var1);
         }
-        printf("printing results...\n");
-        print_result(*exist);
 
     }else if (op->type == FETCH){
         result** res = NULL;
@@ -166,6 +164,7 @@ char* execute_db_operator(db_operator* op) {
             parse_find_result(token, &(args[count++]));
             token = strtok(NULL, ",");
         }
+
         tuple(args, count, &tuple_res); //get tuple, save in tuple_res
 
 
