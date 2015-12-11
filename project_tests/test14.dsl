@@ -21,7 +21,7 @@
 --
 --
 -- Load data in the clustered index and populate all secondary indexes as well. 
-load("data2.csv")
+load(../project_tests/data2.csv)
 -- Siv's edit: clustered index on col4
 create(idx,db1.tbl3.col4,clustered)
 -- Create two secondary indexes: a sorted secondary index on col1 and b-tree secondary index on col3

@@ -21,7 +21,7 @@ status prepare_open_conn(char* data_path){
     //
 
     file_node *db_list = NULL;
-    int db_num = 0;
+    long db_num = 0;
     //list all the db dirs
     res = list_files(data_path, &db_list, &db_num);
     if (res.code == ERROR) return res;
@@ -35,7 +35,6 @@ status prepare_open_conn(char* data_path){
         strcat(file_path, temp->filename);
         strcat(file_path, "/"); //convention for dir
         res = read_db_file(file_path, temp->filename);
-        printf("got here\n");
         if (res.code == ERROR) return res;
         temp = temp->next;
     }
@@ -54,7 +53,7 @@ static status read_db_file(const char* db_path, char* db_name){
 
     db* database = NULL; //NOTE: check for memory errors afterwards
     file_node* table_list = NULL;
-    int table_num = 0;
+    long table_num = 0;
 
     //create db in memory
     create_db(db_name, &database);
@@ -89,7 +88,7 @@ static status read_table_file(const char* table_path, char* table_name, db* data
     //initialize
     table* tb = NULL;
     file_node* col_list = NULL;
-    int col_num = 0;
+    long col_num = 0;
 
     //get list of cols in table and count
     res = list_files(table_path, &col_list, &col_num);
@@ -133,8 +132,8 @@ static status read_col_file(const char* col_path, char* col_name, table* tb){
         return res;
     }
     //read each line in file and insert to table
-    int data;
-    while (fscanf(f, "%d\n", &data) != EOF){
+    long data;
+    while (fscanf(f, "%ld\n", &data) != EOF){
         insert(col, data);
     }
     //close file, return result
@@ -155,7 +154,7 @@ static void free_list(file_node* head){
     }
 }
 
-static status list_files(const char* path, file_node** head, int* count){
+static status list_files(const char* path, file_node** head, long* count){
 #ifdef DEBUG
     log_info("listing files for path: %s\n", path);
 #endif
@@ -163,7 +162,7 @@ static status list_files(const char* path, file_node** head, int* count){
     DIR *dp = NULL;
     struct dirent *ep = NULL;
     file_node* temp = *head;
-    int c = 0;
+    long c = 0;
 
     dp = opendir(path);
     if (dp != NULL){
@@ -198,7 +197,7 @@ static status list_files(const char* path, file_node** head, int* count){
     }
     closedir(dp);
 #ifdef DEBUG
-    log_info("total files found: %d\n", *count);
+    log_info("total files found: %ld\n", *count);
 #endif
     return res;
 }
@@ -212,7 +211,7 @@ static status list_files(const char* path, file_node** head, int* count){
  * remove all db from memory
  * free all db, table, col in memory..
  */
-status prepare_close_conn(char* data_path, int remove_memory){
+status prepare_close_conn(char* data_path, long remove_memory){
     status res = {OK, ""};
 
     //clean the data folder first
@@ -223,7 +222,7 @@ status prepare_close_conn(char* data_path, int remove_memory){
 #ifdef DEBUG
     printf("running cmd: %s\n", cmd);
 #endif
-    int r = system(cmd);
+    long r = system(cmd);
     if (r < 0) {
         res.code = ERROR;
         sprintf(res.error_message, "Error in cleaning data folder.\n");
@@ -280,7 +279,7 @@ static status write_db_file(const char* data_path, db* database){
     printf("running cmd: %s\n", cmd);
 #endif
     //create db folder using command line cmd
-    int r = system(cmd);
+    long r = system(cmd);
     if (r < 0){
         res.code = ERROR;
         sprintf(res.error_message,"Error creating database folder\n");
@@ -289,7 +288,7 @@ static status write_db_file(const char* data_path, db* database){
     }
 
     //for each table in this db, create dir for it
-    for (int i = 0; i<database->db_size; ++i){
+    for (long i = 0; i<database->db_size; ++i){
         PosFlag curr_pos = database->tables_pos[i];
         table* curr_table = &(database->tables[i]);
         if (curr_pos == FULL){
@@ -319,7 +318,7 @@ static status write_table_file(const char* db_path, table* tb){
     printf("running cmd: %s\n", cmd);
 #endif
     //create table folder using cmd
-    int r = system(cmd);
+    long r = system(cmd);
     if (r < 0){
         res.code = ERROR;
         sprintf(res.error_message, "Error creating table folder\n");
@@ -327,7 +326,7 @@ static status write_table_file(const char* db_path, table* tb){
     }
 
     //for each column, create a file
-    for (int i = 0; i<tb->tb_size; i++){
+    for (long i = 0; i<tb->tb_size; i++){
         PosFlag curr_pos = tb->cols_pos[i];
         column* curr_col = &(tb->cols[i]);
         if (curr_pos == FULL) {
@@ -361,9 +360,9 @@ static status write_col_file(const char* table_path, column* col){
     }
     //NOTE: may need to change, as some rows may not contain data
     //or we need to read data from somewhere else
-    for (int i = 0; i<col->row_count; ++i) {
-        int val = col->data[i];
-        fprintf(f, "%d\n", val);
+    for (long i = 0; i<col->row_count; ++i) {
+        long val = col->data[i];
+        fprintf(f, "%ld\n", val);
     }
     fclose(f);
     return res;
@@ -435,7 +434,7 @@ static status remove_disk_file(char* file_path){
     char cmd[BUF_SIZE];
     strcpy(cmd, "rm -rf ");
     strcat(cmd, file_path);
-    int val = system(cmd);
+    long val = system(cmd);
     if (val < 0){
         res.code = ERROR;
         sprintf(res.error_message ,"Error removing path [%s].\n", file_path);
@@ -448,7 +447,7 @@ static status remove_disk_file(char* file_path){
  * remove database from memory and from the db table
  * if del_file flag is 1, delete the db disk folder
  */
-status drop_db(db* database, int del_file, int rm_node){
+status drop_db(db* database, long del_file, long rm_node){
 #ifdef DEBUG
 //    log_info("dropping db: %s", database->name);
     printf("dropping db: %s\n", database->name);
@@ -457,7 +456,7 @@ status drop_db(db* database, int del_file, int rm_node){
 
 
     //free the tables in database
-    for (int i = 0; i<database->db_size; i++){
+    for (long i = 0; i<database->db_size; i++){
         PosFlag curr_pos = database->tables_pos[i];
         table* curr_table = &(database->tables[i]);
         if (curr_pos == FULL) {
@@ -494,13 +493,13 @@ status drop_db(db* database, int del_file, int rm_node){
 }
 
 //NOTE: assume tb in database, tb is not null
-status drop_table(db* database, table* tb, int del_file){
+status drop_table(db* database, table* tb, long del_file){
 #ifdef DEBUG
     log_info("dropping table: %s", tb->name);
 #endif
     status res = {OK, ""};
     //remove table from database
-    for (int i = 0; i<database->db_size; i++){
+    for (long i = 0; i<database->db_size; i++){
         PosFlag* curr_pos = &(database->tables_pos[i]);
         table* curr_table = &(database->tables[i]);
         if (*curr_pos == FULL && strcmp(curr_table->name,tb->name)==0){
@@ -514,7 +513,7 @@ status drop_table(db* database, table* tb, int del_file){
     }
 
     //delete all cols. Since it relational db, we never delete individual cols
-    for (int i = 0; i<tb->tb_size; i++){
+    for (long i = 0; i<tb->tb_size; i++){
         PosFlag* curr_pos = &(tb->cols_pos[i]);
         column* curr_col = &(tb->cols[i]);
         if (*curr_pos == FULL){
@@ -565,7 +564,6 @@ status create_db(const char* db_name, db** database){
         temp = temp->next;
     }
 
-    printf("ffff\n");
 
     //pointer checking: database space allocation
     if (*database == NULL) {
@@ -587,24 +585,22 @@ status create_db(const char* db_name, db** database){
     (*database)->table_count = 0; //right now there is no table in it
     (*database)->db_size = DB_SIZE; //assign the database size
     PosFlag* temp_pos = &((*database)->tables_pos[0]);
-    for (int i = 0; i<DB_SIZE; ++i) temp_pos[i] = EMPTY;
+    for (long i = 0; i<DB_SIZE; ++i) temp_pos[i] = EMPTY;
 
-    printf("haha\n");
     //add db in db_table
     add_db_to_dbtable(*database);
-    printf("hahaha\n");
 
     return res;
 }
 
 
 //NOTE: assume db has enough space for tb
-status create_table(db* database, const char* name, int num_columns, table** tb){
+status create_table(db* database, const char* name, long num_columns, table** tb){
     printf("Try to create table [%s] in db [%s]\n", name, database->name);
     status res = {OK, ""};
 
     //unique table name checking
-    for (int i = 0; i<database->db_size; i++){
+    for (long i = 0; i<database->db_size; i++){
         table curr_table = (database->tables[i]);
         PosFlag curr_pos = (database->tables_pos[i]);
         if (curr_pos == FULL && strcmp(curr_table.name, name) == 0){
@@ -620,8 +616,8 @@ status create_table(db* database, const char* name, int num_columns, table** tb)
         return res;
     }
     //table space allocation
-    int final_pos = 0;
-    for (int i = 0; i<DB_SIZE; i++){
+    long final_pos = 0;
+    for (long i = 0; i<DB_SIZE; i++){
         PosFlag pos = database->tables_pos[i];
         table* spot = &(database->tables[i]);
         if (pos == EMPTY) {
@@ -649,7 +645,7 @@ status create_table(db* database, const char* name, int num_columns, table** tb)
     (*tb)->tb_size = num_columns; //set the size of the table, ie num of cols
     (*tb)->col_length = COL_SIZE; //length of columns
     PosFlag* temp = &((*tb)->cols_pos[0]);
-    for (int i= 0; i<num_columns; i++) temp[i] = EMPTY;
+    for (long i= 0; i<num_columns; i++) temp[i] = EMPTY;
 
     //update database at end cuz we want only update this when no error occurred
     database->table_count++;
@@ -663,7 +659,7 @@ status create_column(table* tb, const char* name, column** col){
     status res = {OK, ""};
 
     //unique col name checking
-    for (int i = 0; i<tb->tb_size; ++i){
+    for (long i = 0; i<tb->tb_size; ++i){
         PosFlag curr_pos = tb->cols_pos[i];
         column curr_col = tb->cols[i];
         if (curr_pos == FULL && strcmp(curr_col.name, name) == 0){
@@ -681,8 +677,8 @@ status create_column(table* tb, const char* name, column** col){
     }
 
     //assign space in table to col
-    int final_pos = 0;
-    for (int i = 0; i<tb->tb_size; ++i){
+    long final_pos = 0;
+    for (long i = 0; i<tb->tb_size; ++i){
         PosFlag curr_pos = tb->cols_pos[i];
         column* curr_col = &(tb->cols[i]);
         if (curr_pos == EMPTY){
@@ -695,7 +691,7 @@ status create_column(table* tb, const char* name, column** col){
 
     //allocate space in column
     (*col)->name = strdup(name); //malloc and assign col name
-    (*col)->data = (int*)malloc(sizeof(int)*(tb->col_length)); //malloc space for this col
+    (*col)->data = (long*)malloc(sizeof(long)*(tb->col_length)); //malloc space for this col
     if ((*col)->data == NULL || (*col)->name == NULL){
         if ((*col)->data != NULL) free((*col)->data);
         if ((*col)->name != NULL) free((*col)->name);
@@ -716,7 +712,7 @@ status create_column(table* tb, const char* name, column** col){
 
 //assume enough space in col,
 //might need to change the API later to include the len of col for checking
-status insert(column *col, int data){
+status insert(column *col, long data){
     status res = {OK, ""};
     col->data[col->row_count] = data;
     col->row_count++;
@@ -731,7 +727,7 @@ status relational_insert(table* tbl, const char* line){
 
     char* delim = ",";
     char* token = strtok(copy, delim);
-    int i = 0;
+    long i = 0;
     while (token){
         insert(&(tbl->cols[i++]), atoi(token));
         token = strtok(NULL, delim);
@@ -758,7 +754,7 @@ status open_db(const char* filename, db** database){
         sprintf(res.error_message,"Database is null.\n");
     }else {
         column** cols = NULL; //array of column pointers
-        int count = 0;
+        long count = 0;
         size_t len = 0;
         char* line = NULL;
         FILE* f = fopen(filename, "r");
@@ -782,7 +778,7 @@ status open_db(const char* filename, db** database){
             char* copy = strdup(line);
             char* delim = ",\n";
             char* token = strtok(copy, delim);
-            int i = 0;
+            long i = 0;
             while(token){
                 insert((cols[i++]), atoi(token));
                 token = strtok(NULL, delim);
@@ -803,7 +799,7 @@ status open_db(const char* filename, db** database){
  * create each table and cols in each table
  * modify headers to make it contains pointers to tables and cols
  */
-static status find_all_table_cols(const char* title, column*** cols, int* count, db* database){
+static status find_all_table_cols(const char* title, column*** cols, long* count, db* database){
     status res = {OK, ""};
 
     //find number of cols
@@ -825,12 +821,12 @@ static status find_all_table_cols(const char* title, column*** cols, int* count,
     return res;
 }
 
-static int parse_and_find_count(const char* title){
+static long parse_and_find_count(const char* title){
 #ifdef DEBUG
     printf("parsing line: %s", title);
 #endif
     char* copy = strdup(title);
-    int count = 0;
+    long count = 0;
     char* token = strtok(copy, ",\n");
     while (token){
         count++;
@@ -838,7 +834,7 @@ static int parse_and_find_count(const char* title){
     }
     free(copy);
 #ifdef DEBUG
-    printf("total cols: %d\n", count);
+    printf("total cols: %ld\n", count);
 #endif
     return count;
 }
@@ -847,8 +843,8 @@ static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], 
     char* copy = strdup(title);
     char* delim = ",.\n";
     char* token = strtok(copy, delim);
-    int i = 0;
-    int j = 0;
+    long i = 0;
+    long j = 0;
     while (token){
         if (j%3 == 1) {
             strcpy(tb_names[i], token); //copy tb name
@@ -869,21 +865,21 @@ static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], 
 
 //assume all same table names are grouped together
 //e.g. it's always like [tb1, tb1, tb1, tb2, tb2, ...]
-static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count) {
-    int i = 0;
+static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, long count) {
+    long i = 0;
     while (i < count) {
         char *cur_tb = tb_names[i];
         printf("cur tb name: %s\n", cur_tb);
-        int j = i;
+        long j = i;
         while (j < count && strcmp(tb_names[j], cur_tb) == 0) {
             ++j;
         }
-        int num_cols = j - i;
-        printf("cur col number: %d\n", num_cols);
+        long num_cols = j - i;
+        printf("cur col number: %ld\n", num_cols);
         table *tb = NULL;
         create_table(database, cur_tb, num_cols, &tb);
         printf("finished creating table\n");
-        for (int k = 0; k < num_cols; ++k) {
+        for (long k = 0; k < num_cols; ++k) {
             column *cur_col = NULL;
             create_column(tb, col_names[i + k], &cur_col);
             cols[i + k] = cur_col;
@@ -910,18 +906,18 @@ static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char 
 
 status fetch(column* col, result* pos_res, result** r){
     status res = {OK, ""};
-    int length = pos_res->num_tuples;
-    int* pos = pos_res->payload;
+    long length = pos_res->num_tuples;
+    long* pos = pos_res->payload;
 
 
     *r = (result *) malloc(sizeof(result));
-    (*r)->payload = (int*)malloc(sizeof(int)*length);
+    (*r)->payload = (long*)malloc(sizeof(long)*length);
     (*r)->num_tuples = length;
     (*r)->type = VAL;
 
 
     //fetch the data
-    for (int i = 0; i<length; ++i){
+    for (long i = 0; i<length; ++i){
         (*r)->payload[i] = col->data[pos[i]];
     }
     return res;
@@ -939,26 +935,26 @@ status create_index(column* col, IndexType type){
         create_sorted_index(col->index->index, col->data, col->row_count);
     }else{
         btree_node* my_btree = NULL;
-        for (int i = 0; i<col->row_count; ++i){
+        for (long i = 0; i<col->row_count; ++i){
             insert_btree(&my_btree, col->data[i], i);
         }
         col->index->index = my_btree;
     }
 
-    //check result !!! turn off later
-    printf("Printing index\n");
-    if (type == SORTED) {
-        for (int i = 0; i < col->row_count; ++i) {
-            printf("(%d,%d) ", ((val_pos*) col->index->index)[i].val,
-                   ((val_pos*) col->index->index)[i].pos);
-        }
-    }else{
-        print_leaf_level((btree_node*)col->index->index);
-    }
+//    //check result !!! turn off later
+//    printf("Printing index\n");
+//    if (type == SORTED) {
+//        for (long i = 0; i < col->row_count; ++i) {
+//            printf("(%ld,%ld) ", ((val_pos*) col->index->index)[i].val,
+//                   ((val_pos*) col->index->index)[i].pos);
+//        }
+//    }else{
+//        print_leaf_level((btree_node*)col->index->index);
+//    }
 }
 
-static void create_sorted_index(val_pos* index, int* vals, int len){
-    for (int i = 0; i<len; ++i){
+static void create_sorted_index(val_pos* index, long* vals, long len){
+    for (long i = 0; i<len; ++i){
         index[i].val = vals[i];
         index[i].pos = i;
     }
@@ -974,34 +970,39 @@ static void free_index(column_index* index){
 }
 
 static int compare_int(const void* a, const void* b){
-    return (*(int*)a - *(int*)b);
+    return (int)(*(long*)a - *(long*)b);
 }
 
 status create_clustered_index(table* tbl, column* col){
-    int rows = col->row_count;
+    long rows = col->row_count;
 
     //initialize val/pos pairs
-    val_pos pairs[rows];
-    for (int i=0; i<rows; ++i){
+    val_pos* pairs = (val_pos*)malloc(sizeof(val_pos)*rows);
+    if (!pairs) printf("Malloc failed\n");
+
+
+    for (long i=0; i<rows; ++i){
         pairs[i].val = col->data[i];
         pairs[i].pos = i;
     }
+
     //qsort pos based on col values
     qsort(pairs, rows, sizeof(val_pos), compare_val_pos);
 
     //sort each col based on pos
-    for (int i = 0; i<tbl->tb_size; ++i){
+    for (long i = 0; i<tbl->tb_size; ++i){
         column* cur_col = &(tbl->cols[i]);
-        int* new_data = (int*)malloc(sizeof(int)*tbl->col_length);
-        int* old_data = cur_col->data;
+        long* new_data = (long*)malloc(sizeof(long)*tbl->col_length);
+        long* old_data = cur_col->data;
 
 
-        for (int j = 0; j<rows; ++j){
+        for (long j = 0; j<rows; ++j){
             new_data[j] = old_data[pairs[j].pos];
         }
         cur_col->data = new_data;
         free(old_data);
     }
+    free(pairs);
 }
 
 static int compare_val_pos(const void* a, const void *b){
@@ -1016,9 +1017,9 @@ static int compare_val_pos(const void* a, const void *b){
  * success: return index
  * fail: return -1
  */
-static int binary_search(int* array, int len, int target){
-    int s = 0, t = len;
-    int m = (s+t)/2;
+static long binary_search(long* array, long len, long target){
+    long s = 0, t = len;
+    long m = (s+t)/2;
     while (s < t){
         if (array[m] < target)
             s = m+1;
@@ -1041,7 +1042,7 @@ static int binary_search(int* array, int len, int target){
  *  pre_selected: pre_selected pos vec
  *  NOTE: preselected is sorted, the returned positions are also sorted
  */
-status col_select_local(column* col, int low, int high, result** r, result* pre_selected){
+status col_select_local(column* col, long low, long high, result** r, result* pre_selected){
     status res = {OK, ""};
     //check if result is allocated
     (*r) = (result*)malloc(sizeof(result));
@@ -1049,43 +1050,44 @@ status col_select_local(column* col, int low, int high, result** r, result* pre_
 
 
     //initialize local variables
-    int length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
-    int temp_result[length]; //initialize a <vec_pos>
-    int count = 0; //actual count for the result
+    long length = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
+    long temp_result[length]; //initialize a <vec_pos>
+    long count = 0; //actual count for the result
     //scan column
-    for (int i = 0; i<length; ++i){
-        int pos = pre_selected == NULL? i: pre_selected->payload[i];
-        int cur_val = col->data[pos];
+    for (long i = 0; i<length; ++i){
+        long pos = pre_selected == NULL? i: pre_selected->payload[i];
+        long cur_val = col->data[pos];
         if (cur_val >= low && cur_val < high) {
-            temp_result[count++] = pos;
+            temp_result[count++] = pos; //TODO:change back
+//            temp_result[count++] = cur_val;
         }
     }
     //set up result
     (*r)->type = POS;
     (*r)->num_tuples = count;
-    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
-    memcpy((*r)->payload, temp_result, count*sizeof(int));
+    (*r)->payload = (long*)malloc(sizeof(long)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(long));
 
     return res;
 }
 /*
  * This func uses sorted index to select
  */
-status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected){
+status sorted_select_local(column* col, long low, long high, result **r, result* pre_selected){
     status res = {OK, ""};
     //init result if not init
     (*r) = (result*)malloc(sizeof(result));
 
 
-    int *temp_result = NULL;
-    if (pre_selected) temp_result = (int*)malloc(sizeof(int)*pre_selected->num_tuples);
-    else temp_result = (int*)malloc(sizeof(int)*col->row_count);
+    long *temp_result = NULL;
+    if (pre_selected) temp_result = (long*)malloc(sizeof(long)*pre_selected->num_tuples);
+    else temp_result = (long*)malloc(sizeof(long)*col->row_count);
 
 
     val_pos* sorted_index = (val_pos*)col->index->index;
-    int length = col->row_count;
-    int s = 0, t= length;
-    int m = (s+t)/2;
+    long length = col->row_count;
+    long s = 0, t= length;
+    long m = (s+t)/2;
     if (sorted_index[0].val >= low){
         m = 0;
     }else {
@@ -1099,7 +1101,7 @@ status sorted_select_local(column* col, int low, int high, result **r, result* p
                 t = m;
             } else {
                 //found the value
-                int temp = m;
+                long temp = m;
                 while (temp > 0 && sorted_index[temp].val == low) temp--;
                 m = temp == m ? temp : temp + 1;
                 break;
@@ -1108,7 +1110,7 @@ status sorted_select_local(column* col, int low, int high, result **r, result* p
         }
     }
 
-    int count=0;
+    long count=0;
     while (sorted_index[m].val < high){
         if (pre_selected){
             if (binary_search(pre_selected->payload, pre_selected->num_tuples, sorted_index[m].pos) > -1){
@@ -1121,35 +1123,39 @@ status sorted_select_local(column* col, int low, int high, result **r, result* p
     //paste over result
     (*r)->type = POS;
     (*r)->num_tuples = count;
-    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
-    memcpy((*r)->payload, temp_result, count*sizeof(int));
+    (*r)->payload = (long*)malloc(sizeof(long)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(long));
     //sort positions
-    qsort((*r)->payload, count, sizeof(int), compare_int);
+    qsort((*r)->payload, count, sizeof(long), compare_int);
 }
 
 
 //assume pre selected is sorted
-status btree_select_local(column *col, int low, int high, result **r, result* pre_selected){
+status btree_select_local(column *col, long low, long high, result **r, result* pre_selected){
     status res = {OK, ""};
     //init result if not init
     (*r) = (result*)malloc(sizeof(result));
 
 
     //search in btree
-    int size = pre_selected==NULL? col->row_count : pre_selected->num_tuples;
-    int temp_result[size];
-    int count = 0;
+    long size = pre_selected==NULL? col->row_count : pre_selected->num_tuples;
+    long temp_result[size];
+    long count = 0;
     btree_node* start_node = search_btree((btree_node*)col->index->index, low);
+
+    print_leaf_node(start_node);
     while (start_node){
         for (int i = 0; i<start_node->num; ++i){
-            int curr = start_node->val[i];
+            long curr = start_node->val[i];
             pos_node* pos_head = (pos_node*)start_node->ptr[i];
             if (curr >= high) break;
             if (curr >= low) {
                 if (pre_selected==NULL) {
                     while (pos_head) {
                         //if nothing is preselect, we just append this to result
-                        temp_result[count++] = pos_head->pos;
+                        temp_result[count++] = pos_head->pos; //TODO:change back
+//                        temp_result[count++] = curr;
+
                         pos_head = pos_head->next;
                     }
                 }else{
@@ -1165,14 +1171,14 @@ status btree_select_local(column *col, int low, int high, result **r, result* pr
         }
         start_node = (btree_node*)start_node->ptr[start_node->node_size];
     }
-
+    printf("result number: %ld\n", count);
     //set up result
     (*r)->type = POS;
     (*r)->num_tuples = count;
-    (*r)->payload = (int*)malloc(sizeof(int)*count); //didnt check allocation error
-    memcpy((*r)->payload, temp_result, count*sizeof(int));
+    (*r)->payload = (long*)malloc(sizeof(long)*count); //didnt check allocation error
+    memcpy((*r)->payload, temp_result, count*sizeof(long));
     //sort positions
-    qsort((*r)->payload, count, sizeof(int), compare_int);
+    qsort((*r)->payload, count, sizeof(long), compare_int);
 }
 
 
@@ -1190,16 +1196,16 @@ status btree_select_local(column *col, int low, int high, result **r, result* pr
  * and write to multiple results
  * NOTE: array of results have to be allocated already
 */
-status shared_select(column *col, result* pre_selected, interval* limits, int length, result* results[]){
+status shared_select(column *col, result* pre_selected, interval* limits, long length, result* results[]){
     status status_res = {OK, ""};
 
     //execute each query
     pthread_t tids[NUM_THREAD];
-    int size = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
-    for (int start = 0; start < size; start+= PAGE_SIZE) {
-        int end = start+PAGE_SIZE > size? size:start+PAGE_SIZE;
+    long size = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
+    for (long start = 0; start < size; start+= PAGE_SIZE) {
+        long end = start+PAGE_SIZE > size? size:start+PAGE_SIZE;
 
-        for (int i = 0; i < length; ++i) {
+        for (long i = 0; i < length; ++i) {
             pthread_t *curr_tid = &(tids[i%NUM_THREAD]);
             scan_arg* arg = (scan_arg*)malloc(sizeof(scan_arg));
             arg->col = col;
@@ -1214,7 +1220,7 @@ status shared_select(column *col, result* pre_selected, interval* limits, int le
             //if all threads are used
             if (i%NUM_THREAD == NUM_THREAD-1 || i+1 == length){
                 //wait for all process to finish
-                for (int j = 0; j<NUM_THREAD; j++){
+                for (long j = 0; j<NUM_THREAD; j++){
                     pthread_join(tids[j], NULL);
                 }
             }
@@ -1226,30 +1232,30 @@ status shared_select(column *col, result* pre_selected, interval* limits, int le
 void* col_select_thread(void* arg){
     scan_arg* args = (scan_arg*)arg;
     result* res = args->res; //already initialized
-    int low = args->lower;
-    int high = args->higher;
-    int start = args->start;
-    int end = args->end;
+    long low = args->lower;
+    long high = args->higher;
+    long start = args->start;
+    long end = args->end;
     column* col = args->col;
     result* pres = args->pre_select;
 
     pthread_t tid = pthread_self();
     printf("thread id: %d", tid);
-    printf("args: l(%d), h(%d), s(%d), t(%d), res(%p)\n", low, high, start, end, res);
+    printf("args: l(%ld), h(%ld), s(%ld), t(%ld), res(%p)\n", low, high, start, end, res);
 
     //scan column (or preselect)
 //    int count = 0;
     if (pres){
-        for (int i = start; i<end; ++i){
-            int pos = pres->payload[i];
-            int cur_val = col->data[pos];
+        for (long i = start; i<end; ++i){
+            long pos = pres->payload[i];
+            long cur_val = col->data[pos];
             if (cur_val >= low && cur_val < high){
                 res->payload[res->num_tuples++] = pos;
             }
         }
     }else{
-        for (int i = start; i<end; ++i){
-            int cur_val = col->data[i];
+        for (long i = start; i<end; ++i){
+            long cur_val = col->data[i];
             if (cur_val >= low && cur_val < high){
                 res->payload[res->num_tuples++] = i;
             }
@@ -1280,24 +1286,24 @@ status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, 
 
     //initialize chunks in different threads
     pthread_t tids[NUM_THREAD];
-    int* res_pos1s[NUM_THREAD];
-    int* res_pos2s[NUM_THREAD];
-    int res_lens[NUM_THREAD];
+    long* res_pos1s[NUM_THREAD];
+    long* res_pos2s[NUM_THREAD];
+    long res_lens[NUM_THREAD];
 
-    int len1 = val1->num_tuples;//longer
-    int len2 = val2->num_tuples;//shorter
+    long len1 = val1->num_tuples;//longer
+    long len2 = val2->num_tuples;//shorter
 
-    int chunk_size = len1/NUM_THREAD;
+    long chunk_size = len1/NUM_THREAD;
 
-    for (int j=0; j<len2; j+=PAGE_SIZE) {
+    for (long j=0; j<len2; j+=PAGE_SIZE) {
         //start and end for the shorter column
-        int start2 = j;
-        int end2 = j+PAGE_SIZE>len2? len2:j+PAGE_SIZE;
-        for (int i = 0; i < NUM_THREAD; ++i) {
-            int start1 = i * chunk_size;
-            int end1 = i==NUM_THREAD-1? len1:start1+chunk_size;
-            res_pos1s[i] = (int *) malloc(sizeof(int) * chunk_size * (end2-start2));
-            res_pos2s[i] = (int *) malloc(sizeof(int) * chunk_size * (end2-start2));
+        long start2 = j;
+        long end2 = j+PAGE_SIZE>len2? len2:j+PAGE_SIZE;
+        for (long i = 0; i < NUM_THREAD; ++i) {
+            long start1 = i * chunk_size;
+            long end1 = i==NUM_THREAD-1? len1:start1+chunk_size;
+            res_pos1s[i] = (long *) malloc(sizeof(long) * chunk_size * (end2-start2));
+            res_pos2s[i] = (long *) malloc(sizeof(long) * chunk_size * (end2-start2));
             join_arg *args = (join_arg *) malloc(sizeof(join_arg));
             args->val1 = val1;
             args->val2 = val2;
@@ -1312,19 +1318,19 @@ status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, 
             args->res_pos2 = res_pos2s[i];
             pthread_create(&(tids[i]), NULL, nested_loop_join_thread, args);
         }
-        for (int i=0;i <NUM_THREAD; ++i){
+        for (long i=0;i <NUM_THREAD; ++i){
             pthread_join(tids[i], NULL);
         }
     }
     //get count of valid pairs
-    int total_len = 0;
-    for (int i=0; i<NUM_THREAD; ++i) total_len+=res_lens[i];
+    long total_len = 0;
+    for (long i=0; i<NUM_THREAD; ++i) total_len+=res_lens[i];
     //allocate space and concat
-    (*res1)->payload = (int*)malloc(sizeof(int)*total_len);
-    (*res2)->payload = (int*)malloc(sizeof(int)*total_len);
+    (*res1)->payload = (long*)malloc(sizeof(long)*total_len);
+    (*res2)->payload = (long*)malloc(sizeof(long)*total_len);
 
-    for (int i = 0; i<NUM_THREAD; ++i){
-        for (int j=0; j<res_lens[i]; ++j){
+    for (long i = 0; i<NUM_THREAD; ++i){
+        for (long j=0; j<res_lens[i]; ++j){
             (*res1)->payload[(*res1)->num_tuples++] = res_pos1s[i][j];
             (*res2)->payload[(*res2)->num_tuples++] = res_pos2s[i][j];
         }
@@ -1335,10 +1341,10 @@ status nested_loop_join(result* val1, result* pos1, result* val2, result* pos2, 
 }
 
 void* nested_loop_join_thread(void* args){
-    int count = 0;
+    long count = 0;
     join_arg* arg = (join_arg*)args;
-    for (int i = arg->start1; i<arg->end1; ++i){
-        for (int j = arg->start2; j<arg->end2; ++j){
+    for (long i = arg->start1; i<arg->end1; ++i){
+        for (long j = arg->start2; j<arg->end2; ++j){
             if (arg->val1->payload[i]==arg->val2->payload[j]){
                 arg->res_pos1[count] = arg->pos1->payload[i];
                 arg->res_pos2[count] = arg->pos2->payload[j];
@@ -1360,12 +1366,12 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
 
 
     //nested loop comparisons
-    int n = val1->num_tuples;
-    int m = val2->num_tuples;
-    int temp_res1[n*m], temp_res2[n*m];
-    int count=0;
-    for (int i = 0; i<n; ++i){
-        for (int j=0; j<n; ++j){
+    long n = val1->num_tuples;
+    long m = val2->num_tuples;
+    long temp_res1[n*m], temp_res2[n*m];
+    long count=0;
+    for (long i = 0; i<n; ++i){
+        for (long j=0; j<n; ++j){
             if (val1->payload[i] == val2->payload[j]){
                 temp_res1[count] = pos1->payload[i];
                 temp_res2[count] = pos2->payload[j];
@@ -1378,10 +1384,10 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
     (*res2)->type = POS;
     (*res1)->num_tuples = count;
     (*res2)->num_tuples = count;
-    (*res1)->payload = (int*)malloc(sizeof(int)*count);
-    (*res2)->payload = (int*)malloc(sizeof(int)*count);
-    memcpy((*res1)->payload, temp_res1, count*sizeof(int));
-    memcpy((*res2)->payload, temp_res2, count*sizeof(int));
+    (*res1)->payload = (long*)malloc(sizeof(long)*count);
+    (*res2)->payload = (long*)malloc(sizeof(long)*count);
+    memcpy((*res1)->payload, temp_res1, count*sizeof(long));
+    memcpy((*res2)->payload, temp_res2, count*sizeof(long));
 }
 
 //multi-thread hash join
@@ -1389,38 +1395,38 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
     status return_status = {OK, ""};
 
     //set up partitions
-    int *partition_val1s[NUM_PARTITION];
-    int *partition_pos1s[NUM_PARTITION];
-    int *partition_val2s[NUM_PARTITION];
-    int *partition_pos2s[NUM_PARTITION];
-    int count1[NUM_PARTITION] = {0};
-    int count2[NUM_PARTITION] = {0};
+    long *partition_val1s[NUM_PARTITION];
+    long *partition_pos1s[NUM_PARTITION];
+    long *partition_val2s[NUM_PARTITION];
+    long *partition_pos2s[NUM_PARTITION];
+    long count1[NUM_PARTITION] = {0};
+    long count2[NUM_PARTITION] = {0};
 
     //partition both columns
     get_partitions(val1, pos1, partition_val1s, partition_pos1s, count1);
     get_partitions(val2, pos2, partition_val2s, partition_pos2s, count2);
 
-    printf("Printing partitions for vector 1\n");
-    for (int i = 0; i<NUM_PARTITION; i++){
-        int* temp = partition_val1s[i];
-        int tlen = count1[i];
-        printf("total len: %d\n", tlen);
-        for (int j = 0; j<tlen; ++j) {
-            printf("%d ", temp[j]);
-        }
-        printf("\n");
-    }
-    printf("Printing partitions for vector 2\n");
-    for (int i = 0; i<NUM_PARTITION; i++){
-        int* temp = partition_val2s[i];
-        int tlen = count2[i];
-        printf("total len: %d\n", tlen);
-        for (int j = 0; j<tlen; ++j) {
-            printf("%d ", temp[j]);
-        }
-        printf("\n");
-    }
-    printf("---------------------\n");
+//    printf("Printing partitions for vector 1\n");
+//    for (long i = 0; i<NUM_PARTITION; i++){
+//        long* temp = partition_val1s[i];
+//        long tlen = count1[i];
+//        printf("total len: %ld\n", tlen);
+//        for (long j = 0; j<tlen; ++j) {
+//            printf("%ld ", temp[j]);
+//        }
+//        printf("\n");
+//    }
+//    printf("Printing partitions for vector 2\n");
+//    for (long i = 0; i<NUM_PARTITION; i++){
+//        long* temp = partition_val2s[i];
+//        long tlen = count2[i];
+//        printf("total len: %ld\n", tlen);
+//        for (long j = 0; j<tlen; ++j) {
+//            printf("%ld ", temp[j]);
+//        }
+//        printf("\n");
+//    }
+//    printf("---------------------\n");
 
 
     //do hash join for each partition
@@ -1428,11 +1434,11 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
     result *valid_pos2[NUM_PARTITION]; //result for each partition (position) from vector 2
     pthread_t tids[NUM_THREAD];
 
-    for (int i = 0; i<NUM_PARTITION; ++i){
+    for (long i = 0; i<NUM_PARTITION; ++i){
         valid_pos1[i] = (result*)malloc(sizeof(result));
         valid_pos2[i] = (result*)malloc(sizeof(result));
-        valid_pos1[i]->payload = (int*)malloc(sizeof(int)*(count1[i]*count2[i]));
-        valid_pos2[i]->payload = (int*)malloc(sizeof(int)*(count1[i]*count2[i]));
+        valid_pos1[i]->payload = (long*)malloc(sizeof(long)*(count1[i]*count2[i]));
+        valid_pos2[i]->payload = (long*)malloc(sizeof(long)*(count1[i]*count2[i]));
         valid_pos1[i]->num_tuples = 0;
         valid_pos2[i]->num_tuples = 0;
         hashjoin_arg* args = (hashjoin_arg*)malloc(sizeof(hashjoin_arg));
@@ -1459,7 +1465,7 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
 
         pthread_create(&(tids[i%NUM_THREAD]), NULL, hash_join_thread, args);
         if (i%NUM_THREAD == (NUM_THREAD-1) || i+1 == NUM_PARTITION){
-            for (int j =0 ;j<NUM_THREAD; ++j){
+            for (long j =0 ;j<NUM_THREAD; ++j){
                 pthread_join(tids[j], NULL);
             }
         }
@@ -1480,14 +1486,14 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
 //    }
 
     //get count for each partition's join result
-    int final_count1 = 0;
-    int final_count2 = 0;
-    for (int i=0; i<NUM_PARTITION; ++i){
+    long final_count1 = 0;
+    long final_count2 = 0;
+    for (long i=0; i<NUM_PARTITION; ++i){
         final_count1 += valid_pos1[i]->num_tuples;
         final_count2 += valid_pos2[i]->num_tuples;
     }
-    printf("final count1: %d\n", final_count1);
-    printf("final count2: %d\n", final_count2);
+    printf("final count1: %ld\n", final_count1);
+    printf("final count2: %ld\n", final_count2);
 
 
 
@@ -1495,20 +1501,20 @@ status hash_join(result* val1, result* pos1, result* val2, result* pos2, result*
     //initialization
     (*res1) = (result*)malloc(sizeof(result));
     (*res2) = (result*)malloc(sizeof(result));
-    (*res1)->payload = (int*)malloc(sizeof(int)*final_count1);
-    (*res2)->payload = (int*)malloc(sizeof(int)*final_count2);
+    (*res1)->payload = (long*)malloc(sizeof(long)*final_count1);
+    (*res2)->payload = (long*)malloc(sizeof(long)*final_count2);
     (*res1)->num_tuples = 0;
     (*res2)->num_tuples = 0;
-    for (int i = 0; i<NUM_PARTITION; ++i){
-        for (int j = 0; j<valid_pos1[i]->num_tuples; ++j){
+    for (long i = 0; i<NUM_PARTITION; ++i){
+        for (long j = 0; j<valid_pos1[i]->num_tuples; ++j){
             (*res1)->payload[(*res1)->num_tuples++] = valid_pos1[i]->payload[j];
         }
-        for (int j=0; j<valid_pos2[i]->num_tuples; ++j){
+        for (long j=0; j<valid_pos2[i]->num_tuples; ++j){
             (*res2)->payload[(*res2)->num_tuples++] = valid_pos2[i]->payload[j];
         }
     }
     //free locally allocated space
-    for (int i=0; i<NUM_PARTITION; ++i){
+    for (long i=0; i<NUM_PARTITION; ++i){
         free_result(valid_pos1[i]);
         free_result(valid_pos2[i]);
         free(partition_pos1s[i]);
@@ -1531,15 +1537,15 @@ void* hash_join_thread(void* arg){
     htable *myhtable = NULL;
     htb_create(&myhtable, args->len1);
     //insert each value from partition 1 to the table
-    for (int i = 0; i<args->len1; ++i){
+    for (long i = 0; i<args->len1; ++i){
         htb_insert(myhtable, args->val1[i], args->pos1[i]);
     }
     //for each value in partition 2, search in table
-    for (int i=0; i<args->len2; ++i){
+    for (long i=0; i<args->len2; ++i){
         htb_node* curr_node = htb_getkey(myhtable, args->val2[i]);
         //if it exists
         if(curr_node != NULL){
-            for (int j=0; j<curr_node->curr_len; ++j){
+            for (long j=0; j<curr_node->curr_len; ++j){
                 args->res_pos1->payload[args->res_pos1->num_tuples++] = curr_node->poses[j];
                 args->res_pos2->payload[args->res_pos2->num_tuples++] = args->pos2[i];
             }
@@ -1550,30 +1556,30 @@ void* hash_join_thread(void* arg){
     htb_destroy(myhtable);
 }
 
-static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]) {
+static void get_partitions(result* val, result* pos, long* par_val[NUM_PARTITION], long* par_pos[NUM_PARTITION], long count[NUM_PARTITION]) {
     pthread_t tids[NUM_THREAD];
 
-    int length = val->num_tuples;
-    int step_size = length/NUM_THREAD;//size for each thread
-    int largest_step = step_size + (length%NUM_THREAD);
+    long length = val->num_tuples;
+    long step_size = length/NUM_THREAD;//size for each thread
+    long largest_step = step_size + (length%NUM_THREAD);
 
     //prepare the write space
-    int *part_val_thread[NUM_THREAD][NUM_PARTITION];
-    int *part_pos_thread[NUM_THREAD][NUM_PARTITION];
-    int len[NUM_THREAD][NUM_PARTITION];
+    long *part_val_thread[NUM_THREAD][NUM_PARTITION];
+    long *part_pos_thread[NUM_THREAD][NUM_PARTITION];
+    long len[NUM_THREAD][NUM_PARTITION];
     //initialize
-    for (int i=0; i<NUM_THREAD; ++i){
-        for (int j=0; j<NUM_PARTITION; ++j){
-            part_val_thread[i][j] = (int*)malloc(sizeof(int)*largest_step);
-            part_pos_thread[i][j] = (int*)malloc(sizeof(int)*largest_step);
+    for (long i=0; i<NUM_THREAD; ++i){
+        for (long j=0; j<NUM_PARTITION; ++j){
+            part_val_thread[i][j] = (long*)malloc(sizeof(long)*largest_step);
+            part_pos_thread[i][j] = (long*)malloc(sizeof(long)*largest_step);
             len[i][j] = 0;
         }
     }
     //multi-process
-    for (int j = 0; j<NUM_THREAD; ++j){
+    for (long j = 0; j<NUM_THREAD; ++j){
         //for each thread, 4 write space for val and pos partitions
-        int start = j*step_size;
-        int end = j==NUM_THREAD-1? start+largest_step:start+step_size;
+        long start = j*step_size;
+        long end = j==NUM_THREAD-1? start+largest_step:start+step_size;
         partition_arg* args = (partition_arg*)malloc(sizeof(partition_arg));
         args->len = len[j];
         args->part_val = part_val_thread[j];
@@ -1585,7 +1591,7 @@ static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION]
 
         pthread_create(&(tids[j]), NULL, partition_thread, args);
     }
-    for (int j =0; j<NUM_THREAD; ++j){
+    for (long j =0; j<NUM_THREAD; ++j){
         pthread_join(tids[j], NULL);
     }
 
@@ -1599,23 +1605,23 @@ static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION]
 
 
     //get final count
-    for (int i=0; i<NUM_THREAD; ++i){
-        for (int j=0; j<NUM_PARTITION; ++j){
+    for (long i=0; i<NUM_THREAD; ++i){
+        for (long j=0; j<NUM_PARTITION; ++j){
             count[j] += len[i][j];
         }
     }
 
     //allocate space
-    for (int i=0; i<NUM_PARTITION; i++){
-        par_val[i] = (int*)malloc(sizeof(int)*count[i]);
-        par_pos[i] = (int*)malloc(sizeof(int)*count[i]);
+    for (long i=0; i<NUM_PARTITION; i++){
+        par_val[i] = (long*)malloc(sizeof(long)*count[i]);
+        par_pos[i] = (long*)malloc(sizeof(long)*count[i]);
     }
 
     //merge results
-    int ks[NUM_PARTITION] = {0};
-    for (int i=0; i<NUM_THREAD; ++i) {
-        for (int j=0; j<NUM_PARTITION; ++j) {
-            for (int k=0; k<len[i][j]; k++){
+    long ks[NUM_PARTITION] = {0};
+    for (long i=0; i<NUM_THREAD; ++i) {
+        for (long j=0; j<NUM_PARTITION; ++j) {
+            for (long k=0; k<len[i][j]; k++){
                 par_val[j][ks[j]] = part_val_thread[i][j][k];
                 par_pos[j][ks[j]++] = part_pos_thread[i][j][k];
             }
@@ -1630,8 +1636,8 @@ static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION]
 //    }
 
     //free local allocated space
-    for (int i=0; i<NUM_THREAD; ++i){
-        for (int j=0; j<NUM_PARTITION; ++j){
+    for (long i=0; i<NUM_THREAD; ++i){
+        for (long j=0; j<NUM_PARTITION; ++j){
             free(part_val_thread[i][j]);
             free(part_pos_thread[i][j]);
         }
@@ -1642,10 +1648,10 @@ void* partition_thread(void* arg){
     partition_arg* args = (partition_arg*)arg;
 //    printf("id %d, %p\n", pthread_self(), args->len);
 //    printf("start %d, end %d\n", args->start, args->end);
-    for (int i = args->start; i<args->end; ++i){
-        int curr_val = args->val->payload[i];
-        int curr_pos = args->pos->payload[i];
-        int curr_part = curr_val%NUM_PARTITION;
+    for (long i = args->start; i<args->end; ++i){
+        long curr_val = args->val->payload[i];
+        long curr_pos = args->pos->payload[i];
+        long curr_part = curr_val%NUM_PARTITION;
         args->part_val[curr_part][(args->len[curr_part])] = curr_val;
         args->part_pos[curr_part][(args->len[curr_part])++] = curr_pos;
     }
@@ -1666,28 +1672,28 @@ void* partition_thread(void* arg){
 
 /*Updates and aggregates*/
 status add(result* val1, result* val2, result** res_val){
-    int len = val1->num_tuples;
+    long len = val1->num_tuples;
 
     (*res_val) = (result*)malloc(sizeof(result));
-    (*res_val)->payload = (int*)malloc(sizeof(int)*len);
+    (*res_val)->payload = (long*)malloc(sizeof(long)*len);
     (*res_val)->type = VAL;
     (*res_val)->num_tuples = len;
 
-    for (int i = 0; i<len; ++i){
+    for (long i = 0; i<len; ++i){
         (*res_val)->payload[i] = val1->payload[i]+val2->payload[i];
     }
 }
 
 //assume val1 - val2
 status subtract(result* val1, result* val2, result** res_val){
-    int len = val1->num_tuples;
+    long len = val1->num_tuples;
 
     (*res_val) = (result*)malloc(sizeof(result));
-    (*res_val)->payload = (int*)malloc(sizeof(int)*len);
+    (*res_val)->payload = (long*)malloc(sizeof(long)*len);
     (*res_val)->type = VAL;
     (*res_val)->num_tuples = len;
 
-    for (int i = 0; i<len; ++i){
+    for (long i = 0; i<len; ++i){
         (*res_val)->payload[i] = val1->payload[i]-val2->payload[i];
     }
 }
@@ -1697,21 +1703,21 @@ status subtract(result* val1, result* val2, result** res_val){
 status min(result* val, result* pos, result** min_val, result** min_pos){
 
     *min_val = (result*)malloc(sizeof(result));
-    (*min_val)->payload = (int*)malloc(sizeof(int));
+    (*min_val)->payload = (long*)malloc(sizeof(long));
     (*min_val)->type = VAL;
     (*min_val)->num_tuples = 1;
 
     if (pos){
         (*min_pos) = (result*)malloc(sizeof(result));
-        (*min_pos)->payload = (int*)malloc(sizeof(int));
+        (*min_pos)->payload = (long*)malloc(sizeof(long));
         (*min_pos)->type = POS;
         (*min_pos)->num_tuples = 1;
     }
 
 
-    int min_idx = 0;
-    int min_so_far = val->payload[0];
-    for (int i=0; i<val->num_tuples; ++i){
+    long min_idx = 0;
+    long min_so_far = val->payload[0];
+    for (long i=0; i<val->num_tuples; ++i){
         if (val->payload[i]<min_so_far){
             min_so_far = val->payload[i];
             min_idx = pos==NULL? i:pos->payload[i];
@@ -1727,20 +1733,20 @@ status min(result* val, result* pos, result** min_val, result** min_pos){
 //if max_pos==NULL, dont get max pos
 status max(result* val, result* pos, result** max_val, result** max_pos){
     *max_val = (result*)malloc(sizeof(result));
-    (*max_val)->payload = (int*)malloc(sizeof(int));
+    (*max_val)->payload = (long*)malloc(sizeof(long));
     (*max_val)->type = VAL;
     (*max_val)->num_tuples = 1;
 
     if (pos){
         (*max_pos) = (result*)malloc(sizeof(result));
-        (*max_pos)->payload = (int*)malloc(sizeof(int));
+        (*max_pos)->payload = (long*)malloc(sizeof(long));
         (*max_pos)->type = POS;
         (*max_pos)->num_tuples = 1;
     }
 
-    int max_idx = 0;
-    int max_so_far = val->payload[0];
-    for (int i=0; i<val->num_tuples; ++i){
+    long max_idx = 0;
+    long max_so_far = val->payload[0];
+    for (long i=0; i<val->num_tuples; ++i){
         if (val->payload[i]>max_so_far){
             max_so_far = val->payload[i];
             max_idx = pos==NULL? i:pos->payload[i];
@@ -1755,36 +1761,36 @@ status max(result* val, result* pos, result** max_val, result** max_pos){
 //NOTE: didnt do error checking
 status avg(result* val, result** avg_val){
     (*avg_val) = (result*)malloc(sizeof(result));
-    (*avg_val)->payload = (int*)malloc(sizeof(int));
+    (*avg_val)->payload = (long*)malloc(sizeof(long));
     (*avg_val)->num_tuples = 1;
     (*avg_val)->type = VAL;
 
     //find sum
-    float sum = 0;
-    for (int i=0; i<val->num_tuples; ++i){
-        sum += ((val->payload[i])/(float)(val->num_tuples));
+    double sum = 0;
+    for (long i=0; i<val->num_tuples; ++i){
+        sum += ((val->payload[i])/(double)(val->num_tuples));
     }
 
-    (*avg_val)->payload[0] = (int)sum;
+    (*avg_val)->payload[0] = (long)sum;
 }
 
 //NOTE: assume pos is sorted
-status update(column *col, result* pos, int new_val){
-    for (int i=0;i <pos->num_tuples; ++i){
+status update(column *col, result* pos, long new_val){
+    for (long i=0;i <pos->num_tuples; ++i){
         col->data[pos->payload[i]] = new_val;
     }
 }
 
-status tuple(result* res_arr[], int num_res, char** tuple){
-    int len = res_arr[0]->num_tuples;
+status tuple(result* res_arr[], long num_res, char** tuple){
+    long len = res_arr[0]->num_tuples;
     char buffer[len*num_res*20];
     strcpy(buffer, "");
 
-    for (int i = 0; i<len; ++i){
-        for (int j=0 ; j<num_res; ++j){
-            int cur = res_arr[j]->payload[i];
+    for (long i = 0; i<len; ++i){
+        for (long j=0 ; j<num_res; ++j){
+            long cur = res_arr[j]->payload[i];
             char temp[20];
-            sprintf(temp, "%d", cur);
+            sprintf(temp, "%ld", cur);
             strcat(buffer,temp);
             if (j!=num_res-1) strcat(buffer,",");
         }
@@ -1799,9 +1805,9 @@ void print_db_table(){
     printf("------------------------------------\n");
     printf("printing database name table...\n");
     db_node* temp = db_table;
-    int i = 0;
+    long i = 0;
     while (temp) {
-        printf("%d: %s\n", i++, temp->this_db->name);
+        printf("%ld: %s\n", i++, temp->this_db->name);
         temp = temp->next;
     }
 }
@@ -1809,34 +1815,34 @@ void print_db_table(){
 void print_db(db* database){
     printf("------------------------------------\n");
     printf("printing database...\n");
-    printf("db name: %s | tbl count: %d\n", database->name, database->table_count);
-    for (int i =0 ; i<database->db_size; ++i){
+    printf("db name: %s | tbl count: %ld\n", database->name, database->table_count);
+    for (long i =0 ; i<database->db_size; ++i){
         if (database->tables_pos[i] == FULL){
-            printf("\t at [%d]: [%s]\n", i, database->tables[i].name);
+            printf("\t at [%ld]: [%s]\n", i, database->tables[i].name);
         }
     }
 }
 
-void print_tbl(table* tbl, int print_data){
+void print_tbl(table* tbl, long print_data){
     printf("------------------------------------\n");
     printf("printing table...\n");
-    printf("tbl name: %s | max col: %d | curr count: %zu \n", tbl->name, tbl->tb_size, tbl->col_count);
-    int rows = 0;
+    printf("tbl name: %s | max col: %ld | curr count: %zu \n", tbl->name, tbl->tb_size, tbl->col_count);
+    long rows = 0;
     printf("\t");
-    for (int i = 0; i<tbl->tb_size; ++i){
+    for (long i = 0; i<tbl->tb_size; ++i){
         if (tbl->cols_pos[i] == FULL) {
             rows = tbl->cols[i].row_count;
             printf("| [%s] |", tbl->cols[i].name);
         }
     }
     printf("\n");
-    printf("total rows: %d\n", rows);
+    printf("total rows: %ld\n", rows);
     if (print_data) {
-        for (int i = 0; i < rows; ++i) {
+        for (long i = 0; i < rows; ++i) {
             printf("\t");
-            for (int j = 0; j < tbl->tb_size; ++j) {
+            for (long j = 0; j < tbl->tb_size; ++j) {
                 if (tbl->cols_pos[j] == FULL) {
-                    printf("| %d |", tbl->cols[j].data[i]);
+                    printf("| %ld |", tbl->cols[j].data[i]);
                 }
             }
             printf("\n");
@@ -1844,14 +1850,14 @@ void print_tbl(table* tbl, int print_data){
     }
 }
 
-void print_system(int print_data){
+void print_system(long print_data){
     printf("------------------------------------\n");
     printf("printing entire system...\n");
     db_node* temp = db_table;
     while (temp){
         db* cur_db = temp->this_db;
         print_db(cur_db);
-        for (int i = 0; i<cur_db->db_size; i++){
+        for (long i = 0; i<cur_db->db_size; i++){
             if (cur_db->tables_pos[i] == FULL){
                 print_tbl(&(cur_db->tables[i]), print_data);
             }
@@ -1863,8 +1869,8 @@ void print_system(int print_data){
 void print_result(result* res){
     printf("------------------------------------\n");
     printf("result type: %s\n", res->type==POS? "positions":"values");
-    for (int i = 0; i<res->num_tuples; i++){
-        printf("%d ", res->payload[i]);
+    for (long i = 0; i<res->num_tuples; i++){
+        printf("%ld,", res->payload[i]);
     }
     printf("\n");
 }
@@ -1874,7 +1880,7 @@ void free_result(result* res){
     if (res){
         if (res->num_tuples) {
             free(res->payload);
-            res->num_tuples = NULL;
+            res->payload = NULL;
         }
         free(res);
         res = NULL;
@@ -1897,12 +1903,71 @@ void free_result(result* res){
 ///* Query API */
 //status query_prepare(const char* query, db_operator** op);
 //status query_execute(db_operator* op, result** results);
+//
+//
+int main(){
+    db* mydb = NULL;
+    create_db("db1", &mydb);
+    open_db("../project_tests/data4.csv", &mydb);
+    open_db("../project_tests/data5.csv", &mydb);
 
+    table* tbl4 = &(mydb->tables[0]);
+    table* tbl5 = &(mydb->tables[1]);
+
+    create_clustered_index(tbl4, &(tbl4->cols[6]));
+    create_clustered_index(tbl5, &(tbl5->cols[6]));
+
+    result *s1, *s2, *f1, *f2, *r1, *r2;
+    col_select_local(&(tbl4->cols[0]), 20000, 40000, &s1, NULL);
+    col_select_local(&(tbl5->cols[0]), 30000, 70000, &s2, NULL);
+    fetch(&(tbl4->cols[0]), s1, &f1);
+    fetch(&(tbl5->cols[0]), s2, &f2);
+    printf("%ld, %ld\n", f1->num_tuples, f2->num_tuples);
+
+//    hash_join(s1,f1,s2,f2,&r1,&r2);
+
+
+//    result *f3, *f4;
+//    fetch(&(tbl4->cols[0]), r1, &f3);
+//    fetch(&(tbl5->cols[0]), r2, &f4);
+//    result* res[2];
+//    res[0] = f3;
+//    res[1] = f4;
+
+//    char* haha;
+//    tuple(res, 2, &haha);
+//    printf("%s\n", haha);
+
+
+}
 
 //int main() {
 //    db *mydb = NULL;
 //    create_db("db1", &mydb);
 //    open_db("./data.txt", &mydb);
+//    open_db("../project_tests/data1.csv", &mydb);
+//    table* tbl1 = &(mydb->tables[0]);
+//    table* tbl2 = &(mydb->tables[1]);
+//
+//    relational_insert(tbl2,"-1,-11,-111,-1111,-11111,1,11");
+//    relational_insert(tbl2,"-2,-22,-222,-2222,-11111,1,11");
+//    relational_insert(tbl2,"-3,-33,-333,-2222,-11111,1,11");
+//    relational_insert(tbl2,"-4,-44,-444,-2222,-11111,1,11");
+//    relational_insert(tbl2,"-5,-55,-555,-2222,-15111,1,11");
+////    open_db("../project_tests/data2.csv", &mydb);
+//
+//
+////    create_clustered_index(&(mydb->tables[1]),&(mydb->tables[1].cols[6]));
+//    create_index(&(tbl2->cols[0]), B_PLUS_TREE);
+////    create_index(&(tbl2->cols[1]), B_PLUS_TREE);
+//    result* s1=NULL, *f1=NULL;
+////    col_select_local(&(tbl2->cols[0]), 220000000,330000000, &s1, NULL);
+//    btree_select_local(&(tbl2->cols[0]), 220000000,330000000, &s1, NULL);
+//
+//    fetch(&(tbl2->cols[4]), s1, &f1);
+//    print_result(f1);
+
+
 //    relational_insert(&(mydb->tables[0]),"-1,-11,-111,-1111,-11111,1,11,111,1111,11111");
 //    relational_insert(&(mydb->tables[0]),"-2,-22,-222,-2222,-11111,1,11,111,1111,11511");
 //    relational_insert(&(mydb->tables[0]),"-3,-33,-333,-2222,-11111,1,11,111,1911,11111");
@@ -1918,7 +1983,7 @@ void free_result(result* res){
 //    fetch(&(mydb->tables[0].cols[4]), s1, &f1);
 //    avg(f1, &a1);
 //    print_result(a1);
-//
+
 //}
 //    result* res=NULL, *res2 = NULL, *res3=NULL;
 //    col_select_local(&(mydb->tables[0].cols[0]), -200000000,0,&res,NULL);

@@ -9,11 +9,10 @@
 
 
 int main(){
-    char temp[] = "as.d.a.s";
-    char* token = strtok(temp, ".");
-    char* t1 = strtok(NULL, "");
+    char* temp = "8100000000";
+    printf("%ld\n", atol(temp));
 
 //    printf("%d %d %d %d", token==NULL, t1==NULL, t2==NULL, t3==NULL);
-    printf("%s\n%s\n", token, t1);
+//    printf("%s\n%s\n", token, t1);
 
 }

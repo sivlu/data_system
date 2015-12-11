@@ -16,14 +16,14 @@
 /*-----------Start of Definition of Macros------------------- ----*/
 
 #define DEBUG 1 // flag for debug
-#define COL_SIZE 1000000 //number of values in a column, need to be fixed
+#define COL_SIZE 2000000 //number of values in a column, need to be fixed
 #define DB_SIZE 10//number of tables in a db
 #define DATA_PATH "../data/" //default data path to store the data
 #define BUF_SIZE 1024 //buffer size for char array
 #define PATH_SIZE 256 //buffer size for a file name
 #define NAME_SIZE 50//buffer size for a name
 #define NUM_THREAD 2 //number of threads used, need to fix later
-#define PAGE_SIZE 100 //number of int in a "page" in L1, need to fix later
+#define PAGE_SIZE 100 //number of long in a "page" in L1, need to fix later
 #define NUM_PARTITION 2 //number of partitions for partition in hash join
 
 
@@ -160,8 +160,8 @@ typedef struct column_index {
  **/
 typedef struct column {
     char* name;
-    int* data;
-    int row_count; //keep it as for milestone 1, may need to change
+    long* data;
+    long row_count; //keep it as for milestone 1, may need to change
     column_index *index;
 } column;
 
@@ -182,11 +182,11 @@ typedef struct column {
  **/
 typedef struct table {
     char* name;
-    int col_count;
+    long col_count;
     column* cols;
     PosFlag* cols_pos;
-    int tb_size;
-    int col_length;
+    long tb_size;
+    long col_length;
 
 } table;
 
@@ -202,10 +202,10 @@ typedef struct table {
  **/
 typedef struct db {
     char* name;
-    int table_count;
+    long table_count;
     table* tables;
     PosFlag* tables_pos;
-    int db_size;
+    long db_size;
 } db;
 
 /* status declares an error code and associated message
@@ -218,15 +218,15 @@ typedef struct status {
 
 
 typedef struct result {
-    int num_tuples;
+    long num_tuples;
     long *payload;
     ResultType type;
 } result;
 
 
 typedef struct val_pos{
-    int val;
-    int pos;
+    long val;
+    long pos;
 }val_pos;
 
 
@@ -257,11 +257,11 @@ typedef struct db_operator {
     table* tbl;
 
     //limits (select)
-    int low;
-    int high;
+    long low;
+    long high;
 
     //for update
-    int value;
+    long value;
 
 } db_operator;
 
@@ -285,53 +285,53 @@ typedef struct file_node{
 typedef struct join_arg{
     result* val1;
     result* pos1;
-    int start1;
-    int end1;
+    long start1;
+    long end1;
     result* val2;
     result* pos2;
-    int start2; //start of val1
-    int end2; //end of val1 (exclusive)
-    int* res_pos1;
-    int* res_pos2;
-    int* res_len;
+    long start2; //start of val1
+    long end2; //end of val1 (exclusive)
+    long* res_pos1;
+    long* res_pos2;
+    long* res_len;
 }join_arg;
 
 //data structure to be passed in shared select
 typedef struct scan_arg{
     column* col; //column to read
-    int lower;
-    int higher;
-    int start;
-    int end;
+    long lower;
+    long higher;
+    long start;
+    long end;
     result* res;
     result* pre_select;
 }scan_arg;
 
 typedef struct partition_arg{
-    int* len; //count of length
-    int** part_val; //val to write, assume pre-allocated
-    int** part_pos; //pos to write, assume pre-allocated
+    long* len; //count of length
+    long** part_val; //val to write, assume pre-allocated
+    long** part_pos; //pos to write, assume pre-allocated
     result* val; //val to read
     result* pos; //pos to read
-    int start; //start of read
-    int end; //end of read
+    long start; //start of read
+    long end; //end of read
 }partition_arg;
 
 typedef struct hashjoin_arg{
-    int *val1; //val1 in partition
-    int *val2; //val2 in partition
-    int *pos1; //pos1 in partition
-    int *pos2; //pos2 in partition
-    int len1;
-    int len2;
+    long *val1; //val1 in partition
+    long *val2; //val2 in partition
+    long *pos1; //pos1 in partition
+    long *pos2; //pos2 in partition
+    long len1;
+    long len2;
     result* res_pos1;
     result* res_pos2;
 }hashjoin_arg;
 
 //lower and upper limits
 typedef struct interval{
-    int lower;
-    int upper;
+    long lower;
+    long upper;
 }interval;
 
 /*-----------End of Type Definition of Struct-------------------*/

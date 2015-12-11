@@ -11,7 +11,7 @@
 -- The exact DSL of this query is left for you to design. You can decide (and experiment) with the order of the select operators, which indexes to use and/or test alternative operators.
 s1=select(db1.tbl2.col1,21000000,510000000)
 s2=select(db1.tbl2.col7,61000000,1010000000,s1)
-s3=select(db1.tbl2.col6,null,8100000000,s2)
+s3=select(db1.tbl2.col6,410000000,8100000000,s2)
 f1=fetch(db1.tbl2.col1,s3)
 f2=fetch(db1.tbl2.col5,s3)
 f3=add(f1,f2)

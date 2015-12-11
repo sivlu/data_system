@@ -27,8 +27,8 @@
 -- create(col,"col7",db1.tbl5,sorted)
 --
 -- Load data immediately in the form of a clustered index
-load("data4.csv")
-load("data5.csv")
+load(../project_tests/data4.csv)
+load(../project_tests/data5.csv)
 -- for Table4, cluster on col7
 create(idx,db1.tbl4.col7,clustered)
 -- for Table5, cluster on col7

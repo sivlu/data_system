@@ -27,7 +27,7 @@ result** get_result_ptr(char* var_name);
 
 char* trim(char *str);
 //status parse_dsl(char* str, db_operator* op);
-int str2int(char* token, int is_high);
+long str2int(char* token, int is_high);
 
 void free_op(db_operator* op);
 

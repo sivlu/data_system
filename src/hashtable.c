@@ -7,17 +7,17 @@
 #include <stdio.h>
 #include <string.h>
 
-void htb_create(htable** mytable, int length){
+void htb_create(htable** mytable, long length){
     (*mytable) = (htable*)malloc(sizeof(htable));
     (*mytable)->length = length;
     (*mytable)->content = (htb_node*)malloc(sizeof(htb_node)*length);
-    (*mytable)->slot = (int*)malloc(sizeof(int)*length);
-    for (int i=0; i<length; ++i){
+    (*mytable)->slot = (long*)malloc(sizeof(long)*length);
+    for (long i=0; i<length; ++i){
         (*mytable)->slot[i] = 1;
     }
 }
-void htb_insert(htable* mytable, int key, int pos){
-    int idx = calculate_hash(mytable, key);
+void htb_insert(htable* mytable, long key, long pos){
+    long idx = calculate_hash(mytable, key);
     if (mytable->slot[idx]){
         mytable->slot[idx] = 0;
         htb_node* temp = &(mytable->content[idx]);
@@ -35,9 +35,9 @@ void htb_insert(htable* mytable, int key, int pos){
         if (temp){
             //check if pos array is full
             if (temp->curr_len == temp->max_len){
-                int* t = temp->poses;
-                temp->poses = (int*)malloc(sizeof(int)*temp->max_len*2);
-                memcpy(temp->poses, t, temp->max_len* sizeof(int));
+                long* t = temp->poses;
+                temp->poses = (long*)malloc(sizeof(long)*temp->max_len*2);
+                memcpy(temp->poses, t, temp->max_len* sizeof(long));
                 temp->max_len = (temp->max_len)*2;
             }
             temp->poses[temp->curr_len++] = pos;
@@ -50,8 +50,8 @@ void htb_insert(htable* mytable, int key, int pos){
     }
 }
 
-htb_node* htb_getkey(htable* mytable, int key){
-    int idx = calculate_hash(mytable, key);
+htb_node* htb_getkey(htable* mytable, long key){
+    long idx = calculate_hash(mytable, key);
     //if idx is empty
     if (mytable->slot[idx] == 1) return NULL;
     //search that linked list
@@ -66,8 +66,8 @@ htb_node* htb_getkey(htable* mytable, int key){
 void htb_destroy(htable* mytable){
     if (!mytable) return;
 
-    printf("table len: %d\n", mytable->length);
-    for (int i = 0; i<mytable->length; ++i){
+    printf("table len: %ld\n", mytable->length);
+    for (long i = 0; i<mytable->length; ++i){
         if (mytable->slot[i] == 0){
             destroy_htb_node(&(mytable->content[i]));
             free(mytable->content[i].poses);
@@ -88,28 +88,28 @@ static void destroy_htb_node(htb_node* node){
     }
 }
 
-static void init_htb_node(htb_node* node, int key, int pos){
+static void init_htb_node(htb_node* node, long key, long pos){
     node->value = key;
     node->curr_len = 1;
     node->max_len = NUM_DUP;
-    node->poses = (int*)malloc(sizeof(int)*NUM_DUP);
+    node->poses = (long*)malloc(sizeof(long)*NUM_DUP);
     (node->poses)[0] = pos;
     node->next = NULL;
 }
 
-static int calculate_hash(htable* mytable, int val){
+static long calculate_hash(htable* mytable, long val){
     if (val<0) return (-val)%(mytable->length);
     return val%(mytable->length);
 }
 
 static void print_table(htable* mytable){
-    for (int i=0; i<mytable->length; ++i){
+    for (long i=0; i<mytable->length; ++i){
         if (mytable->slot[i] == 0){
             htb_node* curr = &(mytable->content[i]);
             while (curr) {
-                printf("(%d)", curr->value);
-                for (int j = 0; j < curr->curr_len; ++j) {
-                    printf("%d,", curr->poses[j]);
+                printf("(%ld)", curr->value);
+                for (long j = 0; j < curr->curr_len; ++j) {
+                    printf("%ld,", curr->poses[j]);
                 }
                 printf("|");
                 curr = curr->next;

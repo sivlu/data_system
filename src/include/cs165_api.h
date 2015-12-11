@@ -97,7 +97,7 @@ status create_db(const char* db_name, db** database);
  *      // Something went wrong
  *  }
  **/
-status create_table(db* database, const char* name, int num_columns, table** tb);
+status create_table(db* database, const char* name, long num_columns, table** tb);
 
 /**
  * create_column(table, name, col)
@@ -144,7 +144,7 @@ status create_clustered_index(table* tbl, column* col);
  * rm_node: 1 remove node from global linked list, 0 o.w.
  * returns  : the status of the operation.
  **/
-status drop_db(db* database, int del_file, int rm_node);
+status drop_db(db* database, long del_file, long rm_node);
 /**
  * drop_table(db, table)
  * Drops the table from the db.  You should permanently delete
@@ -154,22 +154,22 @@ status drop_db(db* database, int del_file, int rm_node);
  * table    : the table to be dropped.
  * returns  : the status of the operation.
  **/
-status drop_table(db* database, table* tb, int del_file);
-//status drop_col(db* database, table* tb, column* col, int del_file);
+status drop_table(db* database, table* tb, long del_file);
+//status drop_col(db* database, table* tb, column* col, long del_file);
 
 
 
 /* Operations API */
 status relational_insert(table* tbl, const char* line);
-status insert(column *col, int data);
-//status delete(column *col, int *pos);
+status insert(column *col, long data);
+//status delete(column *col, long *pos);
 //status col_scan(comparator* f, column* col, result** r);
 //status index_scan(comparator* f, column* col, result** r);
 status fetch(column* col, result* pos, result** r);
-status col_select_local(column* col, int low, int high, result** r, result* pre_selected);
-status btree_select_local(column *col, int low, int high, result **r, result* pre_selected);
-status sorted_select_local(column* col, int low, int high, result **r, result* pre_selected);
-status shared_select(column *col, result* pre_selected, interval* limits, int length, result* results[]);
+status col_select_local(column* col, long low, long high, result** r, result* pre_selected);
+status btree_select_local(column *col, long low, long high, result **r, result* pre_selected);
+status sorted_select_local(column* col, long low, long high, result **r, result* pre_selected);
+status shared_select(column *col, result* pre_selected, interval* limits, long length, result* results[]);
 void* col_select_thread(void* arg);
 
 
@@ -189,12 +189,12 @@ static void free_list(file_node* head);
  * and put them into a linked list of file_node
  * Note that it ignores files starting with '.'
  */
-static status list_files(const char* path, file_node** head, int* count);
+static status list_files(const char* path, file_node** head, long* count);
 
 
 
 /* API related to closing a connection*/
-status prepare_close_conn(char* data_path, int remove_memory);
+status prepare_close_conn(char* data_path, long remove_memory);
 static status write_db_file(const char* data_path, db* database);
 static status write_table_file(const char* db_path, table* tb);
 static status write_col_file(const char* table_path, column* col);
@@ -210,24 +210,24 @@ void free_result(result* res);
 static void free_before_closing();
 
 /*open db related*/
-static status find_all_table_cols(const char* line, column*** cols, int* count, db* database);
-static int parse_and_find_count(const char* title);
+static status find_all_table_cols(const char* line, column*** cols, long* count, db* database);
+static long parse_and_find_count(const char* title);
 static void parse_and_find_names(const char* title, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE]);
-static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, int count);
+static void create_and_find_cols(db* database, char tb_names[][NAME_SIZE], char col_names[][NAME_SIZE], column** cols, long count);
 
 /*debug functions*/
 void print_db_table();
-void print_system(int data);
+void print_system(long data);
 void print_db(db* database);
-void print_tbl(table* tbl, int data);
+void print_tbl(table* tbl, long data);
 void print_result(result* res);
 
 /*index related*/
 static int compare_val_pos(const void* a, const void *b);
 static int compare_int(const void* a, const void* b);
 static void free_index(column_index* index);
-static void create_sorted_index(val_pos* index, int* vals, int len);
-static int binary_search(int* array, int len, int target);
+static void create_sorted_index(val_pos* index, long* vals, long len);
+static long binary_search(long* array, long len, long target);
 
 
 /*join functions*/
@@ -237,18 +237,18 @@ status hash_join_local(result* val1, result* pos1, result* val2, result* pos2, r
 void* nested_loop_join_thread(void* args);
 void* partition_thread(void* arg);
 void* hash_join_thread(void* arg);
-static void get_partitions(result* val, result* pos, int* par_val[NUM_PARTITION], int* par_pos[NUM_PARTITION], int count[NUM_PARTITION]);
+static void get_partitions(result* val, result* pos, long* par_val[NUM_PARTITION], long* par_pos[NUM_PARTITION], long count[NUM_PARTITION]);
 
 /*aggregate and updates*/
 status add(result* val1, result* val2, result** res_val);
 status subtract(result* val1, result* val2, result** res_val); //assume val1 - val2
-status update(column *col, result* pos, int new_val);
+status update(column *col, result* pos, long new_val);
 status min(result* val, result* pos, result** min_val, result** min_pos); //if min_pos==NULL, dont get min pos
 status max(result* val, result* pos, result** max_val, result** max_pos); //if max_pos==NULL, dont get max pos
 status avg(result* val, result** avg_val);
 
 //get tuple
-status tuple(result* res_arr[], int num_res, char** tuple);
+status tuple(result* res_arr[], long num_res, char** tuple);
 
 #endif /* CS165_H */
 

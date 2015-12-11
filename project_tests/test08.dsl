@@ -20,7 +20,9 @@
 --
 --
 -- Load data immediately in the form of a clustered index
-load("data1.csv")
+-- 
+load(../project_tests/data1.csv)
+--
 -- Siv's edit: sort col7
 create(idx,db1.tbl2.col7,clustered)
 --

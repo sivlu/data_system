@@ -40,20 +40,27 @@ void parse_find_column(char* token, column** col){
     char* col_name = strtok(NULL, ".");
 
 
-    table* tbl;
+    table* tbl = NULL;
     db* cur_db = db_table->this_db; //head of list since we only use 1 in test
-    for (int i=0; i<cur_db->db_size; ++i){
+    for (long i=0; i<cur_db->db_size; ++i){
         if (cur_db->tables_pos[i]==FULL && strcmp(cur_db->tables[i].name, tb_name)==0){
             tbl = &(cur_db->tables[i]);
+            break;
         }
     }
+    if (tbl==NULL){
+        printf("Can't find table [%s]\n", tb_name);
+        return;
+    }
 
-    for (int i=0 ;i<tbl->col_count; ++i){
+    for (long i=0 ;i<tbl->col_count; ++i){
         if (strcmp(tbl->cols[i].name, col_name)==0){
             *col = &(tbl->cols[i]);
+            printf("Successfully found column [%s]\n", col_name);
             return;
         }
     }
+    printf("Can't find column [%s]\n", col_name);
     *col = NULL;
 
 }
@@ -69,12 +76,14 @@ void parse_find_table(char* token, table** tbl){
     db* cur_db = db_table->this_db; //head of list since we only use 1 in test
 //    print_db(cur_db);
 
-    for (int i=0; i<cur_db->db_size; ++i){
+    for (long i=0; i<cur_db->db_size; ++i){
         if (cur_db->tables_pos[i]==FULL && strcmp(cur_db->tables[i].name, tb_name)==0){
             *tbl = &(cur_db->tables[i]);
+            printf("Successfully found table [%s]\n", tb_name);
             return;
         }
     }
+    printf("Can't find table [%s]\n", tb_name);
     *tbl = NULL;
 }
 
@@ -576,9 +585,9 @@ char* trim(char *str)
 }
 
 //convert string to int used in limits
-int str2int(char* token, int is_high){
+long str2int(char* token, int is_high){
     if (strcmp(token,"null")==0){
         return is_high? INT_MAX : INT_MIN;
     }
-    return atoi(token);
+    return atol(token);
 }

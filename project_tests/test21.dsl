@@ -13,7 +13,7 @@
 
 
 -- Load data immediately in the form of a clustered index
-load("data7.csv")
+load(../project_tests/data7.csv)
 
 -- Siv's edit: clustered index on col7
 create(idx,db1.tbl7.col7,clustered)
