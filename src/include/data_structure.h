@@ -23,7 +23,7 @@
 #define PATH_SIZE 256 //buffer size for a file name
 #define NAME_SIZE 50//buffer size for a name
 #define NUM_THREAD 2 //number of threads used, need to fix later
-#define PAGE_SIZE 100 //number of long in a "page" in L1, need to fix later
+#define PAGE_SIZE 4096 //number of long in a "page" in L1, need to fix later
 #define NUM_PARTITION 2 //number of partitions for partition in hash join
 
 

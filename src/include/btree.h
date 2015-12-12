@@ -8,7 +8,7 @@
 #include "data_structure.h"
 #include "utils.h"
 
-#define NODESIZE 3
+#define NODESIZE 5
 
 
 

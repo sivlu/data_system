@@ -1110,8 +1110,9 @@ status sorted_select_local(column* col, long low, long high, result **r, result*
         }
     }
 
+
     long count=0;
-    while (sorted_index[m].val < high){
+    while (sorted_index[m].val < high && count<col->row_count){
         if (pre_selected){
             if (binary_search(pre_selected->payload, pre_selected->num_tuples, sorted_index[m].pos) > -1){
                 temp_result[count++] = sorted_index[m++].pos;
@@ -1120,6 +1121,7 @@ status sorted_select_local(column* col, long low, long high, result **r, result*
             temp_result[count++] = sorted_index[m++].pos;
         }
     }
+
     //paste over result
     (*r)->type = POS;
     (*r)->num_tuples = count;
@@ -1127,6 +1129,7 @@ status sorted_select_local(column* col, long low, long high, result **r, result*
     memcpy((*r)->payload, temp_result, count*sizeof(long));
     //sort positions
     qsort((*r)->payload, count, sizeof(long), compare_int);
+    free(temp_result);
 }
 
 
@@ -1202,10 +1205,18 @@ status shared_select(column *col, result* pre_selected, interval* limits, long l
     //execute each query
     pthread_t tids[NUM_THREAD];
     long size = pre_selected==NULL? col->row_count:pre_selected->num_tuples;
+
+    for (int i =0 ; i<length; ++i){
+        results[i]->payload = (long*)malloc(sizeof(long)*size);
+        results[i]->num_tuples = 0;
+        results[i]->type = POS;
+    }
+
     for (long start = 0; start < size; start+= PAGE_SIZE) {
         long end = start+PAGE_SIZE > size? size:start+PAGE_SIZE;
 
         for (long i = 0; i < length; ++i) {
+
             pthread_t *curr_tid = &(tids[i%NUM_THREAD]);
             scan_arg* arg = (scan_arg*)malloc(sizeof(scan_arg));
             arg->col = col;
@@ -1226,6 +1237,10 @@ status shared_select(column *col, result* pre_selected, interval* limits, long l
             }
         }
     }
+//
+//    for (int  i = 0;  i < length; ++ i) {
+//        printf("Result [%d] has length [%ld]\n", i, results[i]->num_tuples);
+//    }
 }
 
 //res should be initialized
@@ -1240,11 +1255,10 @@ void* col_select_thread(void* arg){
     result* pres = args->pre_select;
 
     pthread_t tid = pthread_self();
-    printf("thread id: %d", tid);
-    printf("args: l(%ld), h(%ld), s(%ld), t(%ld), res(%p)\n", low, high, start, end, res);
+//    printf("thread id: %d", tid);
+//    printf("args: l(%ld), h(%ld), s(%ld), t(%ld), res(%p)\n", low, high, start, end, res);
 
     //scan column (or preselect)
-//    int count = 0;
     if (pres){
         for (long i = start; i<end; ++i){
             long pos = pres->payload[i];
@@ -1364,12 +1378,13 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
     *res2 = (result*)malloc(sizeof(result));
 
 
-
     //nested loop comparisons
     long n = val1->num_tuples;
     long m = val2->num_tuples;
-    long temp_res1[n*m], temp_res2[n*m];
+    long* temp_res1 = (long*)malloc(sizeof(long)*n*m);
+    long* temp_res2 = (long*)malloc(sizeof(long)*n*m);
     long count=0;
+
     for (long i = 0; i<n; ++i){
         for (long j=0; j<n; ++j){
             if (val1->payload[i] == val2->payload[j]){
@@ -1388,6 +1403,8 @@ status nested_loop_join_local(result* val1, result* pos1, result* val2, result* 
     (*res2)->payload = (long*)malloc(sizeof(long)*count);
     memcpy((*res1)->payload, temp_res1, count*sizeof(long));
     memcpy((*res2)->payload, temp_res2, count*sizeof(long));
+    free(temp_res1);
+    free(temp_res2);
 }
 
 //multi-thread hash join
@@ -1818,7 +1835,7 @@ void print_db(db* database){
     printf("db name: %s | tbl count: %ld\n", database->name, database->table_count);
     for (long i =0 ; i<database->db_size; ++i){
         if (database->tables_pos[i] == FULL){
-            printf("\t at [%ld]: [%s]\n", i, database->tables[i].name);
+            printf("\t at [%ld]: [%s] of len [%ld]\n", i, database->tables[i].name, database->tables[i].cols[0].row_count);
         }
     }
 }
@@ -1950,6 +1967,9 @@ static void write_to_file(result* arr[], int num, char* filename){
 //    tuple(res, 2, &tt);
 //    printf("%s\n", tt);
 //}
+///******End of TEST 26 **********/
+
+
 
 
 //    nested_loop_join_local()
