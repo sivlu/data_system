@@ -24,7 +24,7 @@
 #include "message.h"
 #include "utils.h"
 
-#define DEFAULT_STDIN_BUFFER_SIZE 1024
+#define DEFAULT_STDIN_BUFFER_SIZE 4096
 
 /**
  * connect_client()
@@ -75,7 +75,7 @@ int main(void)
     }
 
     char *output_str = NULL;
-    int len = 0;
+    ssize_t len = 0;
 
     // Continuously loop and wait for input. At each iteration:
     // 1. output interactive marker

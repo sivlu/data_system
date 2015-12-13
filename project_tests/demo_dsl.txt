@@ -1,0 +1,6 @@
+-- persistency
+create(db,db1)
+load(../project_tests/data.txt)
+relational_insert(db1.tbl1,-1,-11,-111,-1111,-11111,1,11,111,1111,11111)
+shutdown
+-- select and fetch

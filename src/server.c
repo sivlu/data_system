@@ -30,12 +30,14 @@
 
 //#define DEFAULT_QUERY_BUFFER_SIZE 1024
 
+#define MAX_SIZE_MSG 1024
+
 //global
-struct db_node *db_table; //used in execute query
+struct db_node *db_table = NULL; //used in execute query
 extern var_table variable_pool;
 
 //macro for testing, 1 means "shutdown" removes memory, 0 o.w.
-#define REMOVE_MEM 0
+#define REMOVE_MEM 1
 
 
 
@@ -61,7 +63,11 @@ db_operator* parse_command(message* recv_message, message* send_message) {
     dbo->col = NULL;
     dbo->tbl = NULL;
 
-
+    //check if no db is loaded if not create db called
+    char* substring = "create(db";
+    if (db_table == NULL && strstr(recv_message->payload, substring)==NULL){
+        prepare_open_conn(DATA_PATH);
+    }
 
     // Here you parse the message and fill in the proper db_operator fields for
     // now we just log the payload
@@ -91,6 +97,7 @@ char* execute_db_operator(db_operator* op) {
     log_info("Executing operation: %s", op_name[op->type]);
 
 
+    //create each of these
     if (op->type == CREATE_DB){
         db* mydb = NULL;
         create_db(op->string, &mydb);
@@ -106,9 +113,6 @@ char* execute_db_operator(db_operator* op) {
         printf("low: %d,high: %d\n", op->low, op->high);
 
         result** exist = NULL;
-//        variable_pool.var_names[0] = strdup(op->lhs_var1);
-//        exist = &(variable_pool.var_results[0]);
-
         exist = create_var_in_pool(op->lhs_var1);
         if (op->col->index){
             if (op->col->index->type == SORTED){
@@ -208,7 +212,7 @@ char* execute_db_operator(db_operator* op) {
  **/
 void handle_client(int client_socket) {
     int done = 0;
-    int length = 0;
+    ssize_t length = 0;
 
     log_info("Connected to socket: %d.\n", client_socket);
 
@@ -244,17 +248,42 @@ void handle_client(int client_socket) {
             send_message.length = strlen(result);
 
             // 3. Send status of the received message (OK, UNKNOWN_QUERY, etc)
-            if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
-                log_err("Failed to send message.");
-                free(result);
-                exit(1);
-            }
-
             // 4. Send response of request
-            if (send(client_socket, result, send_message.length, 0) == -1) {
-                log_err("Failed to send message.");
-                free(result);
-                exit(1);
+            size_t size_msg = strlen(result);
+            printf("Result length is: [%ld]\n", size_msg);
+            if (size_msg>MAX_SIZE_MSG) {
+                int num_chunks = size_msg % MAX_SIZE_MSG == 0 ? (int)(size_msg / MAX_SIZE_MSG): (int)(size_msg / MAX_SIZE_MSG + 1);
+                char *chunks[num_chunks];
+                for (int i = 0; i < num_chunks; ++i) {
+//                    chunks[i] = malloc(sizeof(char) * MAX_SIZE_MSG);
+//                    size_t bytes_to_copy = ((i + 1) * MAX_SIZE_MSG) > size_msg ? (size_msg - (i + 1) * MAX_SIZE_MSG) : MAX_SIZE_MSG;
+//                    strncpy(chunks[i], result + i * MAX_SIZE_MSG, bytes_to_copy);
+//                    chunks[i][bytes_to_copy] = 0;
+//                    if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
+//                        free(result);
+//                        exit(1);
+//                    }
+//                    if (send(client_socket, chunks[i], bytes_to_copy, 0) == -1) {
+//                        free(result);
+//                        exit(1);
+//                    }
+                    char* temp = "RESULT STRING TOO LARGE";
+                    for (int i = 0; i<5; ++i) {
+                        send(client_socket, &(send_message), sizeof(message), 0);
+                        send(client_socket, temp, sizeof(temp), 0);
+                    }
+                }
+            }else {
+                if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
+                    log_err("Failed to send message.");
+                    free(result);
+                    exit(1);
+                }
+                if (send(client_socket, result, send_message.length, 0) == -1) {
+                    log_err("Failed to send message.");
+                    free(result);
+                    exit(1);
+                }
             }
         }
     } while (!done);

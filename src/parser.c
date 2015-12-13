@@ -167,6 +167,8 @@ result** create_var_in_pool(char* var_name){
  * NOTE: op is pre-allocated
  */
 status parse_command_string(char* str, db_operator* op){
+
+
     log_info("Parsing: %s", str);
     char* trim_str = trim(str);
 //    char* trim_str = str;

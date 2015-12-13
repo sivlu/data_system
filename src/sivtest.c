@@ -9,10 +9,15 @@
 
 
 int main(){
-    char* temp = "8100000000";
-    printf("%ld\n", atol(temp));
-
-//    printf("%d %d %d %d", token==NULL, t1==NULL, t2==NULL, t3==NULL);
-//    printf("%s\n%s\n", token, t1);
+    char* temp = "dhjfgwegkwegkwefbkwebfiwgefuwe";
+    char* chunks[5];
+    for (int i=0; i<5; ++i){
+        chunks[i] = (char*)malloc(sizeof(char)*6);
+        strncpy(chunks[i], temp+i*5, 5);
+        chunks[i][5]=0;
+    }
+    for (int i=0; i<5; ++i){
+        printf("%s\n", chunks[i]);
+    }
 
 }

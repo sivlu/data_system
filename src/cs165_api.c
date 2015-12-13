@@ -1811,7 +1811,7 @@ status tuple(result* res_arr[], long num_res, char** tuple){
             strcat(buffer,temp);
             if (j!=num_res-1) strcat(buffer,",");
         }
-        strcat(buffer,"\n");
+        if (i!= len-1) strcat(buffer,"\n");
     }
     *tuple = strdup(buffer);
 }
